@@ -2,12 +2,12 @@
 
 👋 Ciao! Questo è un progettino nato per smanettare e studiare in modo visivo gli Automi a Stati Finiti (super utile se stai preparando esami tipo *Theory of Computation* 📚). 
 
-> 🤖 **Fun Fact:** Il codice di questa app è stato generato interamente tramite Intelligenza Artificiale (Gemini) partendo dai miei prompt!
+> 🤖 **Fun Fact:** Il codice di questa app è stato generato interamente tramite Intelligenza Artificiale.
 
 ## 🎯 Cosa fa?
 È una web-app minimal e interattiva dove puoi disegnare il tuo automa e vedere *esattamente* cosa succede quando gli dai in pasto una stringa. Gestisce senza problemi:
 * **DFA** (Deterministici)
-* **NFA** (Non Deterministici - *sì, durante il test si colorano più stati di verde in parallelo, è il potere del non determinismo!*)
+* **NFA** (Non Deterministici)
 * **e-NFA** (Automi con mosse $\epsilon$)
 
 ## ✨ Features principali
@@ -18,9 +18,7 @@
 * ⚡ **Zero sbatti:** Niente server, niente build. È tutto dentro un singolo file HTML!
 
 ## 🚀 Come si usa?
-Letteralmente: scarica `simulatore.html` e fai doppio click per aprirlo nel browser. Fine. 
+Scarica `index.html` e fai doppio click per aprirlo nel browser.
     
-È perfetto anche da hostare al volo (e gratis) su **GitHub Pages**: basta caricare il file in una repo e attivare l'impostazione.
-
 ---
 *Happy simulating!* 🧑‍💻
