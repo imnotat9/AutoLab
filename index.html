@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulatore Automi (DFA, NFA, e-NFA)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- D3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* D3 Canvas Styles */
+        svg {
+            cursor: default;
+            user-select: none;
+            background-color: #f8fafc; /* light gray bg */
+        }
+        
+        /* Nodes */
+        .node circle {
+            fill: #ffffff;
+            stroke: #1e293b; /* Slate 800 - dark gray/black */
+            stroke-width: 2px;
+            transition: fill 0.2s, stroke 0.2s, stroke-width 0.2s;
+        }
+        /* Selection */
+        .node.selected circle {
+            stroke: #ea580c; /* Orange for clear selection */
+            stroke-width: 3.5px;
+        }
+        /* Active during simulation */
+        .node.active circle.main-circle {
+            fill: #bbf7d0; /* Light green */
+            stroke: #166534; /* Dark green */
+        }
+        /* Final State - Double Circle */
+        .node.final circle.inner {
+            stroke: #1e293b;
+            stroke-width: 2px;
+            fill: none;
+            display: block;
+        }
+        .node.final.selected circle.inner {
+            stroke: #ea580c;
+        }
+        .node.final.active circle.inner {
+            stroke: #166534;
+        }
+        .node text {
+            font-size: 14px;
+            font-weight: 600;
+            fill: #0f172a;
+            pointer-events: none;
+            text-anchor: middle;
+            dominant-baseline: central;
+        }
+        
+        /* Links */
+        .link {
+            fill: none;
+            stroke: #475569; /* Slate 600 */
+            stroke-width: 2px;
+            cursor: pointer;
+            transition: stroke 0.2s, stroke-width 0.2s;
+        }
+        .link.selected {
+            stroke: #ea580c;
+            stroke-width: 3.5px;
+        }
+        .link-label {
+            font-size: 14px;
+            fill: #1e293b;
+            font-weight: 700;
+            pointer-events: none;
+        }
+        .link-label-bg {
+            fill: #f8fafc;
+            opacity: 0.9;
+        }
+
+        /* Temp link during drag */
+        .dragline {
+            fill: none;
+            stroke: #94a3b8;
+            stroke-width: 2px;
+            stroke-dasharray: 5,5;
+        }
+
+        /* Tooltip & Modals */
+        .fade-enter { opacity: 0; }
+        .fade-enter-active { opacity: 1; transition: opacity 200ms ease-in; }
+        .fade-exit { opacity: 1; }
+        .fade-exit-active { opacity: 0; transition: opacity 200ms ease-out; }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col overflow-hidden text-slate-800">
+
+    <!-- Header -->
+    <header class="bg-slate-900 text-white px-6 py-3 flex justify-between items-center z-10 shadow-md">
+        <h1 class="text-xl font-bold flex items-center gap-2">
+            <i class="ph ph-graph"></i>
+            Simulatore Automi a Stati Finiti
+        </h1>
+        <div id="message-box" class="opacity-0 px-4 py-1.5 rounded bg-blue-500 text-white font-medium text-sm transition-opacity duration-300">
+            <!-- Messaggi temporanei -->
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="flex flex-1 overflow-hidden">
+        
+        <!-- Sidebar Controlli -->
+        <aside class="w-80 bg-white border-r border-gray-200 flex flex-col shadow-lg z-10 overflow-y-auto">
+            
+            <!-- Strumenti -->
+            <div class="p-5 border-b border-gray-100">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Strumenti di Disegno</h2>
+                <div class="flex gap-2 mb-2">
+                    <button id="btn-mode-select" class="flex-1 py-2 px-3 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-semibold text-sm flex items-center justify-center gap-1 transition-colors">
+                        <i class="ph ph-cursor-click"></i> Seleziona
+                    </button>
+                </div>
+                <div class="flex gap-2">
+                    <button id="btn-mode-node" class="flex-1 py-2 px-3 rounded-md bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 font-semibold text-sm flex items-center justify-center gap-1 transition-colors">
+                        <i class="ph ph-circle-plus"></i> Stato
+                    </button>
+                    <button id="btn-mode-link" class="flex-1 py-2 px-3 rounded-md bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 font-semibold text-sm flex items-center justify-center gap-1 transition-colors">
+                        <i class="ph ph-arrow-right"></i> Collega
+                    </button>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-3 leading-tight" id="mode-hint">
+                    Modalità selezione: clicca per selezionare, trascina per muovere. Usa Canc/Backspace per eliminare.
+                </p>
+            </div>
+
+            <!-- Proprietà -->
+            <div class="p-5 border-b border-gray-100 min-h-[180px]">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Proprietà Selezione</h2>
+                <div id="panel-empty" class="text-sm text-slate-400 italic text-center py-4">Nessun elemento selezionato.</div>
+                
+                <!-- Proprietà Stato -->
+                <div id="panel-node" class="hidden flex flex-col gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Nome Stato</label>
+                        <input type="text" id="prop-node-name" class="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="prop-node-start" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                            <span class="text-sm text-slate-700 font-medium">Stato Iniziale</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="prop-node-final" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                            <span class="text-sm text-slate-700 font-medium">Stato Finale</span>
+                        </label>
+                    </div>
+                    <button id="btn-delete-node" class="text-sm text-red-600 hover:text-red-800 text-left font-semibold flex items-center gap-1 mt-1">
+                        <i class="ph ph-trash"></i> Elimina Stato (Canc)
+                    </button>
+                </div>
+
+                <!-- Proprietà Collegamento -->
+                <div id="panel-link" class="hidden flex flex-col gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Simboli Transizione (es. a, b)</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="prop-link-label" class="flex-1 border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                            <button id="btn-add-epsilon-panel" class="px-3 py-1.5 bg-slate-100 border border-slate-300 rounded text-sm hover:bg-slate-200 font-medium" title="Aggiungi Epsilon">ε</button>
+                        </div>
+                    </div>
+                    <button id="btn-delete-link" class="text-sm text-red-600 hover:text-red-800 text-left font-semibold flex items-center gap-1 mt-1">
+                        <i class="ph ph-trash"></i> Elimina Collegamento (Canc)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Simulazione -->
+            <div class="p-5 flex-1 flex flex-col bg-slate-50">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Simulazione</h2>
+                
+                <div class="mb-3">
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Alfabeto (opzionale, es. a,b)</label>
+                    <input type="text" id="sim-alphabet" class="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500" placeholder="Lascia vuoto per libere">
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Stringa in Input</label>
+                    <input type="text" id="sim-input" class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500 font-mono" placeholder="Inserisci stringa da testare...">
+                </div>
+
+                <div class="flex flex-col gap-2 mb-4">
+                    <button id="btn-sim-quick" class="w-full py-2 bg-blue-600 text-white rounded font-semibold text-sm hover:bg-blue-700 transition flex justify-center items-center gap-2">
+                        <i class="ph ph-lightning"></i> Simulazione Completa
+                    </button>
+                    <div class="flex gap-2">
+                        <button id="btn-sim-start-step" class="flex-1 py-2 bg-slate-800 text-white rounded font-semibold text-sm hover:bg-slate-900 transition flex justify-center items-center gap-1">
+                            <i class="ph ph-play"></i> Step by Step
+                        </button>
+                        <button id="btn-sim-stop" class="hidden flex-1 py-2 bg-red-100 text-red-700 border border-red-200 rounded font-semibold text-sm hover:bg-red-200 transition flex justify-center items-center gap-1">
+                            <i class="ph ph-stop"></i> Ferma
+                        </button>
+                    </div>
+                    <button id="btn-sim-next" class="hidden w-full py-2 bg-green-100 text-green-800 border border-green-300 rounded font-bold text-sm hover:bg-green-200 transition flex justify-center items-center gap-1">
+                        Passo Successivo <i class="ph ph-arrow-right-bold"></i>
+                    </button>
+                </div>
+
+                <!-- Log Simulazione -->
+                <div id="sim-status" class="bg-white border border-slate-200 rounded p-3 text-sm flex-1 overflow-y-auto font-mono shadow-inner">
+                    <span class="text-slate-400 italic">In attesa di input...</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Area di Disegno -->
+        <main class="flex-1 relative" id="canvas-container">
+            <!-- SVG init via D3 -->
+        </main>
+    </div>
+
+    <!-- Modale Transizione (Sostituisce il prompt nativo) -->
+    <div id="modal-transition" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-80 overflow-hidden transform transition-all">
+            <div class="px-5 py-4 border-b border-slate-100">
+                <h3 class="text-lg font-bold text-slate-800">Nuova Transizione</h3>
+                <p class="text-xs text-slate-500 mt-1">Inserisci i simboli separati da virgola.</p>
+            </div>
+            <div class="p-5">
+                <input type="text" id="modal-input" class="w-full border border-slate-300 rounded px-3 py-2 text-base focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-shadow mb-3" placeholder="es. a, b" autocomplete="off">
+                <div class="flex gap-2">
+                    <button id="modal-btn-epsilon" class="py-1 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-sm font-semibold border border-slate-200">
+                        Inserisci Epsilon (ε)
+                    </button>
+                </div>
+            </div>
+            <div class="bg-slate-50 px-5 py-3 flex justify-end gap-2 border-t border-slate-100">
+                <button id="modal-btn-cancel" class="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded font-semibold text-sm transition-colors">Annulla</button>
+                <button id="modal-btn-ok" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold text-sm transition-colors">Conferma</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logica Applicazione -->
+    <script>
+        // --- Costanti e Stato Globale ---
+        const EPSILON = 'ε';
+        const NODE_RADIUS = 26;
+
+        let nodes = [];
+        let links = [];
+        let nodeIdCounter = 0;
+        
+        let mode = 'select'; // 'select', 'node', 'link'
+        let selectedNode = null;
+        let selectedLink = null;
+        
+        // Stato Simulazione
+        let isSimulating = false;
+        let simString = "";
+        let simIndex = 0;
+        let activeStates = new Set();
+        
+        // --- Setup D3.js ---
+        const container = document.getElementById('canvas-container');
+        const svg = d3.select("#canvas-container").append("svg")
+            .attr("width", "100%")
+            .attr("height", "100%")
+            .on("click", handleSvgClick);
+
+        // Definizioni Frecce (Normale, Selezionata)
+        const defs = svg.append("defs");
+        
+        defs.append("marker")
+            .attr("id", "arrowhead")
+            .attr("viewBox", "-0 -5 10 10")
+            .attr("refX", NODE_RADIUS + 7)
+            .attr("refY", 0)
+            .attr("orient", "auto")
+            .attr("markerWidth", 7)
+            .attr("markerHeight", 7)
+            .attr("xoverflow", "visible")
+            .append("svg:path")
+            .attr("d", "M 0,-5 L 10 ,0 L 0,5")
+            .attr("fill", "#475569") // Slate 600
+            .style("stroke", "none");
+
+        defs.append("marker")
+            .attr("id", "arrowhead-selected")
+            .attr("viewBox", "-0 -5 10 10")
+            .attr("refX", NODE_RADIUS + 7)
+            .attr("refY", 0)
+            .attr("orient", "auto")
+            .attr("markerWidth", 7)
+            .attr("markerHeight", 7)
+            .attr("xoverflow", "visible")
+            .append("svg:path")
+            .attr("d", "M 0,-5 L 10 ,0 L 0,5")
+            .attr("fill", "#ea580c") // Orange 600
+            .style("stroke", "none");
+
+        const linkGroup = svg.append("g").attr("class", "links");
+        const nodeGroup = svg.append("g").attr("class", "nodes");
+        
+        // Linea per drag&drop transizioni
+        let dragLine = svg.append("path")
+            .attr("class", "dragline hidden")
+            .attr("d", "M0,0L0,0");
+
+        let mousedownNode = null;
+
+        // --- Aggiornamento Grafica (D3) ---
+        function updateGraph() {
+            // -- Links --
+            let linkElements = linkGroup.selectAll("g.link-group")
+                .data(links, d => d.source.id + "-" + d.target.id);
+
+            linkElements.exit().remove();
+
+            let linkEnter = linkElements.enter().append("g")
+                .attr("class", "link-group");
+
+            linkEnter.append("path")
+                .attr("class", "link")
+                .attr("marker-end", "url(#arrowhead)")
+                .on("click", (event, d) => {
+                    if (mode === 'select' && !isSimulating) {
+                        selectLink(d);
+                        event.stopPropagation();
+                    }
+                });
+
+            // Sfondo etichetta
+            linkEnter.append("text")
+                .attr("class", "link-label-bg")
+                .attr("text-anchor", "middle")
+                .attr("dy", -6)
+                .attr("stroke", "#f8fafc")
+                .attr("stroke-width", 5)
+                .attr("stroke-linejoin", "round");
+                
+            // Testo etichetta
+            linkEnter.append("text")
+                .attr("class", "link-label")
+                .attr("text-anchor", "middle")
+                .attr("dy", -6);
+
+            linkElements = linkEnter.merge(linkElements);
+
+            linkElements.select("path")
+                .classed("selected", d => d === selectedLink)
+                .attr("marker-end", d => d === selectedLink ? "url(#arrowhead-selected)" : "url(#arrowhead)")
+                .attr("d", calculateLinkPath);
+
+            linkElements.select(".link-label")
+                .text(d => d.label)
+                .attr("x", d => getLabelPosition(d).x)
+                .attr("y", d => getLabelPosition(d).y);
+                
+            linkElements.select(".link-label-bg")
+                .text(d => d.label)
+                .attr("x", d => getLabelPosition(d).x)
+                .attr("y", d => getLabelPosition(d).y);
+
+            // -- Nodes --
+            let nodeElements = nodeGroup.selectAll("g.node")
+                .data(nodes, d => d.id);
+
+            nodeElements.exit().remove();
+
+            let nodeEnter = nodeElements.enter().append("g")
+                .attr("class", "node")
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended))
+                .on("click", (event, d) => {
+                    if (isSimulating) return;
+                    if (mode === 'select') {
+                        selectNode(d);
+                    }
+                    event.stopPropagation();
+                });
+
+            // Freccia d'ingresso per stato iniziale
+            nodeEnter.append("path")
+                .attr("class", "start-arrow")
+                .attr("d", `M ${-NODE_RADIUS - 35} 0 L ${-NODE_RADIUS - 2} 0 M ${-NODE_RADIUS - 12} -6 L ${-NODE_RADIUS - 2} 0 L ${-NODE_RADIUS - 12} 6`)
+                .attr("stroke", "#1e293b") // Dark grey
+                .attr("stroke-width", 2.5)
+                .attr("fill", "none")
+                .attr("stroke-linejoin", "round")
+                .attr("stroke-linecap", "round");
+
+            // Cerchio Principale
+            nodeEnter.append("circle")
+                .attr("class", "main-circle")
+                .attr("r", NODE_RADIUS);
+            
+            // Cerchio Interno (Stato Finale)
+            nodeEnter.append("circle")
+                .attr("class", "inner hidden")
+                .attr("r", NODE_RADIUS - 6);
+
+            nodeEnter.append("text")
+                .text(d => d.name);
+
+            nodeElements = nodeEnter.merge(nodeElements);
+
+            nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
+            
+            // Applica classi di stato
+            nodeElements.classed("selected", d => d === selectedNode);
+            nodeElements.classed("active", d => activeStates.has(d.id));
+            nodeElements.classed("final", d => d.isFinal);
+            
+            // Mostra/Nascondi freccia iniziale
+            nodeElements.select(".start-arrow").style("display", d => d.isStart ? "block" : "none");
+            
+            // Mostra/Nascondi cerchio interno (finale)
+            nodeElements.select(".inner").classed("hidden", d => !d.isFinal);
+            
+            // Aggiorna Nome
+            nodeElements.select("text").text(d => d.name);
+
+            updateSidebar();
+        }
+
+        // --- Calcolo Posizioni e Curve ---
+        function calculateLinkPath(d) {
+            if (d.source === d.target) {
+                // Self-loop verso l'alto
+                let x = d.source.x;
+                let y = d.source.y;
+                return `M ${x - 8},${y - NODE_RADIUS + 2} C ${x - 30},${y - NODE_RADIUS - 40} ${x + 30},${y - NODE_RADIUS - 40} ${x + 8},${y - NODE_RADIUS + 2}`;
+            }
+            
+            let bidirectional = links.find(l => l.source === d.target && l.target === d.source);
+            
+            if (bidirectional) {
+                // Curva
+                let dx = d.target.x - d.source.x;
+                let dy = d.target.y - d.source.y;
+                let dr = Math.sqrt(dx * dx + dy * dy) * 1.5; // Moltiplicatore per abbassare l'arco
+                return `M ${d.source.x},${d.source.y} A ${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
+            } else {
+                // Linea dritta
+                return `M ${d.source.x},${d.source.y} L ${d.target.x},${d.target.y}`;
+            }
+        }
+
+        function getLabelPosition(d) {
+            if (d.source === d.target) {
+                return { x: d.source.x, y: d.source.y - NODE_RADIUS - 30 };
+            }
+            let bidirectional = links.find(l => l.source === d.target && l.target === d.source);
+            if (bidirectional) {
+                let dx = d.target.x - d.source.x;
+                let dy = d.target.y - d.source.y;
+                let dr = Math.sqrt(dx * dx + dy * dy);
+                let offsetX = (dx / 2) - (dy / dr) * 20;
+                let offsetY = (dy / 2) + (dx / dr) * 20;
+                return { x: d.source.x + offsetX, y: d.source.y + offsetY };
+            } else {
+                return { x: (d.source.x + d.target.x) / 2, y: (d.source.y + d.target.y) / 2 };
+            }
+        }
+
+        // --- Logica Eventi Mouse / Drag ---
+        function dragstarted(event, d) {
+            if (isSimulating) return;
+            if (mode === 'select') {
+                d3.select(this).raise();
+            } else if (mode === 'link') {
+                mousedownNode = d;
+                dragLine.classed("hidden", false)
+                    .attr("d", `M${d.x},${d.y}L${d.x},${d.y}`);
+            }
+        }
+
+        function dragged(event, d) {
+            if (isSimulating) return;
+            if (mode === 'select') {
+                d.x = event.x;
+                d.y = event.y;
+                updateGraph();
+            } else if (mode === 'link' && mousedownNode) {
+                let p = d3.pointer(event, container);
+                dragLine.attr("d", `M${mousedownNode.x},${mousedownNode.y}L${p[0]},${p[1]}`);
+            }
+        }
+
+        function dragended(event, d) {
+            if (isSimulating) return;
+            if (mode === 'link' && mousedownNode) {
+                dragLine.classed("hidden", true);
+                
+                let p = d3.pointer(event, container);
+                let targetNode = nodes.find(n => {
+                    let dx = n.x - p[0];
+                    let dy = n.y - p[1];
+                    // Area di drop estesa
+                    return (dx * dx + dy * dy) < (NODE_RADIUS * NODE_RADIUS * 3); 
+                });
+                
+                if (targetNode) {
+                    promptForTransition(mousedownNode, targetNode);
+                }
+                mousedownNode = null;
+            }
+        }
+
+        function handleSvgClick(event) {
+            if (isSimulating) return;
+            
+            if (mode === 'node') {
+                let p = d3.pointer(event);
+                addNode(p[0], p[1]);
+            } else if (mode === 'select') {
+                selectNode(null);
+                selectLink(null);
+            }
+        }
+
+        // --- Gestione Dati & Operazioni ---
+        function addNode(x, y) {
+            let isFirst = nodes.length === 0;
+            let node = {
+                id: "q" + nodeIdCounter,
+                name: "q" + nodeIdCounter,
+                isStart: isFirst,
+                isFinal: false,
+                x: x,
+                y: y
+            };
+            nodeIdCounter++;
+            nodes.push(node);
+            selectNode(node);
+            // Torna a select mode se eravamo in node creation per comodità UX
+            setMode('select');
+        }
+
+        // Modale per nuova transizione (sostituisce il prompt nativo)
+        let pendingLink = null;
+        const modal = document.getElementById('modal-transition');
+        const modalInput = document.getElementById('modal-input');
+
+        function promptForTransition(source, target) {
+            // Controlla se esiste già
+            let existing = links.find(l => l.source === source && l.target === target);
+            if (existing) {
+                selectLink(existing);
+                return;
+            }
+            
+            pendingLink = { source, target };
+            modalInput.value = '';
+            modal.classList.remove('hidden');
+            setTimeout(() => modalInput.focus(), 50);
+        }
+
+        document.getElementById('modal-btn-cancel').addEventListener('click', () => {
+            modal.classList.add('hidden');
+            pendingLink = null;
+        });
+
+        document.getElementById('modal-btn-epsilon').addEventListener('click', () => {
+            modalInput.value = modalInput.value ? modalInput.value + ',' + EPSILON : EPSILON;
+            modalInput.focus();
+        });
+
+        document.getElementById('modal-btn-ok').addEventListener('click', finalizeTransition);
+        modalInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') finalizeTransition();
+            if (e.key === 'Escape') {
+                modal.classList.add('hidden');
+                pendingLink = null;
+            }
+        });
+
+        function finalizeTransition() {
+            if (!pendingLink) return;
+            let val = modalInput.value.replace(/\s+/g, '');
+            if (!val) {
+                showMessage("Inserisci almeno un simbolo (oppure Epsilon).", "error");
+                return;
+            }
+            
+            let link = { source: pendingLink.source, target: pendingLink.target, label: val };
+            links.push(link);
+            modal.classList.add('hidden');
+            pendingLink = null;
+            
+            selectLink(link);
+            setMode('select'); // Torna a modalità selezione
+        }
+
+        function deleteSelected() {
+            if (isSimulating) return;
+            
+            if (selectedNode) {
+                // Elimina link collegati
+                links = links.filter(l => l.source !== selectedNode && l.target !== selectedNode);
+                nodes = nodes.filter(n => n !== selectedNode);
+                
+                // Gestione stato iniziale orfano
+                if (selectedNode.isStart && nodes.length > 0) {
+                    nodes[0].isStart = true;
+                }
+                
+                selectedNode = null;
+                updateGraph();
+                showMessage("Stato eliminato.");
+            } else if (selectedLink) {
+                links = links.filter(l => l !== selectedLink);
+                selectedLink = null;
+                updateGraph();
+                showMessage("Collegamento eliminato.");
+            }
+        }
+
+        // Event Listener Tastiera (Canc / Backspace)
+        document.addEventListener('keydown', (e) => {
+            // Ignora se siamo in un input text
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            // Ignora se modale aperto
+            if (!modal.classList.contains('hidden')) return;
+
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                deleteSelected();
+            }
+        });
+
+        // --- Selezione & UI Pannello ---
+        function selectNode(node) {
+            selectedNode = node;
+            selectedLink = null;
+            updateGraph();
+        }
+
+        function selectLink(link) {
+            selectedLink = link;
+            selectedNode = null;
+            updateGraph();
+        }
+
+        function updateSidebar() {
+            document.getElementById('panel-empty').classList.toggle('hidden', selectedNode || selectedLink);
+            document.getElementById('panel-node').classList.toggle('hidden', !selectedNode);
+            document.getElementById('panel-link').classList.toggle('hidden', !selectedLink);
+
+            if (selectedNode) {
+                document.getElementById('prop-node-name').value = selectedNode.name;
+                document.getElementById('prop-node-start').checked = selectedNode.isStart;
+                document.getElementById('prop-node-final').checked = selectedNode.isFinal;
+            }
+            if (selectedLink) {
+                document.getElementById('prop-link-label').value = selectedLink.label;
+            }
+        }
+
+        // Ascoltatori Input Sidebar
+        document.getElementById('prop-node-name').addEventListener('input', (e) => {
+            if (selectedNode) { selectedNode.name = e.target.value; updateGraph(); }
+        });
+        document.getElementById('prop-node-start').addEventListener('change', (e) => {
+            if (selectedNode && e.target.checked) {
+                nodes.forEach(n => n.isStart = false); // Forza un solo stato iniziale
+                selectedNode.isStart = true;
+                updateGraph();
+            } else if (selectedNode && !e.target.checked) {
+                e.target.checked = true; // Impedisci di toglierlo se è l'unico
+                showMessage("Deve esistere uno stato iniziale.", "error");
+            }
+        });
+        document.getElementById('prop-node-final').addEventListener('change', (e) => {
+            if (selectedNode) { selectedNode.isFinal = e.target.checked; updateGraph(); }
+        });
+        document.getElementById('btn-delete-node').addEventListener('click', deleteSelected);
+
+        document.getElementById('prop-link-label').addEventListener('input', (e) => {
+            if (selectedLink) { 
+                let val = e.target.value.replace(/\s+/g, '');
+                selectedLink.label = val; 
+                updateGraph(); 
+            }
+        });
+        document.getElementById('btn-add-epsilon-panel').addEventListener('click', () => {
+            if (selectedLink) {
+                let input = document.getElementById('prop-link-label');
+                let val = input.value;
+                val = val ? val + "," + EPSILON : EPSILON;
+                selectedLink.label = val;
+                input.value = val;
+                updateGraph();
+            }
+        });
+        document.getElementById('btn-delete-link').addEventListener('click', deleteSelected);
+
+        // --- Gestione Modalità ---
+        function setMode(newMode) {
+            if (isSimulating) return;
+            mode = newMode;
+            
+            // Reset stili bottoni
+            document.querySelectorAll('button[id^="btn-mode-"]').forEach(btn => {
+                btn.classList.remove('bg-blue-50', 'text-blue-700', 'border-blue-200');
+                btn.classList.add('bg-white', 'text-slate-600', 'border-slate-300');
+            });
+            let activeBtn = document.getElementById(`btn-mode-${mode}`);
+            activeBtn.classList.remove('bg-white', 'text-slate-600', 'border-slate-300');
+            activeBtn.classList.add('bg-blue-50', 'text-blue-700', 'border-blue-200');
+
+            let hint = "";
+            if (mode === 'select') hint = "Modalità selezione: clicca per selezionare, trascina per muovere. Usa Canc/Backspace per eliminare.";
+            else if (mode === 'node') hint = "Clicca nell'area di lavoro per creare un nuovo stato.";
+            else if (mode === 'link') hint = "Trascina da uno stato all'altro per creare un collegamento.";
+            document.getElementById('mode-hint').innerText = hint;
+            
+            svg.style("cursor", mode === 'node' ? 'crosshair' : 'default');
+        }
+
+        document.getElementById('btn-mode-select').addEventListener('click', () => setMode('select'));
+        document.getElementById('btn-mode-node').addEventListener('click', () => setMode('node'));
+        document.getElementById('btn-mode-link').addEventListener('click', () => setMode('link'));
+
+
+        // --- Logica Simulazione ---
+
+        function getStartNode() {
+            return nodes.find(n => n.isStart);
+        }
+
+        // Calcola l'Epsilon-Closure di un set di stati
+        function eClosure(stateIds) {
+            let closure = new Set(stateIds);
+            let stack = Array.from(stateIds);
+            
+            while(stack.length > 0) {
+                let currentId = stack.pop();
+                let outgoingLinks = links.filter(l => l.source.id === currentId);
+                
+                for(let link of outgoingLinks) {
+                    let symbols = link.label.split(',').map(s => s.trim());
+                    if (symbols.includes(EPSILON)) {
+                        if (!closure.has(link.target.id)) {
+                            closure.add(link.target.id);
+                            stack.push(link.target.id);
+                        }
+                    }
+                }
+            }
+            return closure;
+        }
+
+        // Muove i token in base al simbolo in input
+        function move(stateIds, symbol) {
+            let nextStates = new Set();
+            for(let id of stateIds) {
+                let outgoingLinks = links.filter(l => l.source.id === id);
+                for(let link of outgoingLinks) {
+                    let symbols = link.label.split(',').map(s => s.trim());
+                    if (symbols.includes(symbol)) {
+                        nextStates.add(link.target.id);
+                    }
+                }
+            }
+            return nextStates;
+        }
+
+        function appendSimLog(text, type="normal") {
+            const logDiv = document.getElementById('sim-status');
+            const p = document.createElement('div');
+            let colorClass = "text-slate-700";
+            if (type === 'success') colorClass = "text-green-700 font-bold bg-green-50 p-1 rounded mt-2 border border-green-200";
+            if (type === 'error') colorClass = "text-red-700 font-bold bg-red-50 p-1 rounded mt-2 border border-red-200";
+            if (type === 'info') colorClass = "text-blue-700 font-semibold";
+            
+            p.className = `mb-1 ${colorClass}`;
+            p.innerHTML = text;
+            logDiv.appendChild(p);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function clearSimLog() {
+            document.getElementById('sim-status').innerHTML = '';
+        }
+
+        function checkAcceptance() {
+            for(let id of activeStates) {
+                let n = nodes.find(x => x.id === id);
+                if (n && n.isFinal) return true;
+            }
+            return false;
+        }
+
+        function validateInputAlphabet(inputStr) {
+            let alphaStr = document.getElementById('sim-alphabet').value.replace(/\s+/g, '');
+            if (!alphaStr) return true; // Nessun controllo se alfabeto non specificato
+            let alphabet = alphaStr.split(',');
+            for (let char of inputStr) {
+                if (!alphabet.includes(char)) {
+                    showMessage(`Simbolo '${char}' non appartiene all'alfabeto.`, "error");
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // --- Azioni Simulazione ---
+        
+        // Simulazione Completa/Rapida
+        document.getElementById('btn-sim-quick').addEventListener('click', () => {
+            if(nodes.length === 0) return showMessage("L'automa è vuoto.", "error");
+            let startNode = getStartNode();
+            if (!startNode) return showMessage("Manca lo stato iniziale.", "error");
+
+            let inputStr = document.getElementById('sim-input').value;
+            if (!validateInputAlphabet(inputStr)) return;
+
+            clearSimLog();
+            appendSimLog(`Test rapido: <b>"${inputStr || 'ε'}"</b>`, "info");
+            
+            // Inizio
+            activeStates = eClosure(new Set([startNode.id]));
+            
+            // Passi
+            for(let i = 0; i < inputStr.length; i++) {
+                let char = inputStr[i];
+                let next = move(activeStates, char);
+                activeStates = eClosure(next);
+                if (activeStates.size === 0) break; 
+            }
+            
+            updateGraph();
+            
+            if (checkAcceptance()) {
+                appendSimLog("Risultato: Stringa ACCETTATA.", "success");
+            } else {
+                appendSimLog("Risultato: Stringa RIFIUTATA.", "error");
+            }
+            
+            // Pulisci visualizzazione dopo 2.5s
+            setTimeout(() => {
+                if(!isSimulating) {
+                    activeStates.clear();
+                    updateGraph();
+                }
+            }, 2500);
+        });
+
+        // Simulazione Step-by-Step
+        document.getElementById('btn-sim-start-step').addEventListener('click', () => {
+            if(nodes.length === 0) return showMessage("L'automa è vuoto.", "error");
+            let startNode = getStartNode();
+            if (!startNode) return showMessage("Manca lo stato iniziale.", "error");
+
+            let inputStr = document.getElementById('sim-input').value;
+            if (!validateInputAlphabet(inputStr)) return;
+
+            isSimulating = true;
+            simString = inputStr;
+            simIndex = 0;
+            
+            selectNode(null);
+            selectLink(null);
+            setMode('select'); 
+
+            // UI
+            document.getElementById('btn-sim-start-step').classList.add('hidden');
+            document.getElementById('btn-sim-quick').classList.add('hidden');
+            document.getElementById('btn-sim-stop').classList.remove('hidden');
+            document.getElementById('btn-sim-next').classList.remove('hidden');
+            document.getElementById('btn-sim-next').disabled = false;
+            document.getElementById('btn-sim-next').classList.remove('opacity-50');
+
+            clearSimLog();
+            appendSimLog(`Avvio Step-by-Step. Input: <b>"${simString || 'ε'}"</b>`, "info");
+            
+            activeStates = eClosure(new Set([startNode.id]));
+            
+            let stateNames = Array.from(activeStates).map(id => nodes.find(n=>n.id===id).name).join(', ');
+            appendSimLog(`Inizializzazione (con e-closure): Stati { ${stateNames} }`);
+            updateGraph();
+            
+            // Se stringa vuota, valuta subito
+            if (simString.length === 0) {
+                evaluteFinalStep();
+            }
+        });
+
+        document.getElementById('btn-sim-next').addEventListener('click', () => {
+            if (!isSimulating) return;
+
+            let char = simString[simIndex];
+            appendSimLog(`Leggo simbolo: <b>'${char}'</b>`);
+            
+            let moved = move(activeStates, char);
+            activeStates = eClosure(moved);
+            
+            if (activeStates.size === 0) {
+                appendSimLog(`Nessuna transizione valida. Automa in pozzo (bloccato).`, "error");
+                evaluteFinalStep();
+                updateGraph();
+                return;
+            } 
+            
+            let stateNames = Array.from(activeStates).map(id => nodes.find(n=>n.id===id).name).join(', ');
+            appendSimLog(`Nuovi stati attivi: { ${stateNames} }`);
+            
+            simIndex++;
+            updateGraph();
+
+            if (simIndex >= simString.length) {
+                evaluteFinalStep();
+            }
+        });
+
+        function evaluteFinalStep() {
+            if (checkAcceptance()) {
+                appendSimLog("Fine stringa. <b>ACCETTATA</b>", "success");
+            } else {
+                appendSimLog("Fine stringa. <b>RIFIUTATA</b>", "error");
+            }
+            document.getElementById('btn-sim-next').classList.add('opacity-50');
+            document.getElementById('btn-sim-next').disabled = true;
+        }
+
+        document.getElementById('btn-sim-stop').addEventListener('click', () => {
+            isSimulating = false;
+            activeStates.clear();
+            updateGraph();
+            
+            // UI
+            document.getElementById('btn-sim-start-step').classList.remove('hidden');
+            document.getElementById('btn-sim-quick').classList.remove('hidden');
+            document.getElementById('btn-sim-stop').classList.add('hidden');
+            document.getElementById('btn-sim-next').classList.add('hidden');
+            
+            appendSimLog("Simulazione interrotta.");
+        });
+
+        // --- Utility ---
+        function showMessage(msg, type="info") {
+            const box = document.getElementById('message-box');
+            box.innerText = msg;
+            
+            if(type === 'error') {
+                box.className = "px-4 py-1.5 rounded text-white font-medium text-sm transition-opacity duration-300 bg-red-500 opacity-100";
+            } else {
+                box.className = "px-4 py-1.5 rounded text-white font-medium text-sm transition-opacity duration-300 bg-slate-800 opacity-100";
+            }
+            
+            setTimeout(() => { 
+                box.classList.remove('opacity-100'); 
+                box.classList.add('opacity-0'); 
+            }, 3000);
+        }
+
+        // Init
+        updateGraph();
+
+    </script>
+</body>
+</html>
