@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Automaton Simulator (DFA, NFA, e-NFA)</title>
-    <!-- Favicon (Icona della scheda) -->
+    <!-- Favicon -->
     <link rel="icon" href="logo.png" type="image/png">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -20,6 +20,9 @@
             cursor: default;
             user-select: none;
             background-color: #f8fafc;
+            width: 100%;
+            height: 100%;
+            display: block;
         }
         
         /* Nodes */
@@ -88,7 +91,7 @@
             stroke-dasharray: 5,5;
         }
 
-        /* Selection Box (Rettangolo Azzurro) */
+        /* Selection Box */
         .selection-box {
             fill: rgba(14, 165, 233, 0.15);
             stroke: rgba(14, 165, 233, 0.6);
@@ -113,23 +116,25 @@
     <!-- Main Workspace -->
     <div class="flex flex-1 overflow-hidden relative">
         
-        <!-- Sidebar SX: Controlli e Strumenti -->
+        <!-- Sidebar SX -->
         <aside id="sidebar-left" class="w-80 bg-white border-r border-gray-200 shadow-lg z-20 transition-[width] duration-300 relative flex flex-col shrink-0">
-            <!-- Pulsante Toggle SX -->
             <button id="btn-toggle-left" class="absolute -right-8 top-1/2 transform -translate-y-1/2 bg-white border border-gray-200 border-l-0 rounded-r-md p-1.5 shadow-sm hover:bg-gray-50 z-30 flex items-center justify-center">
                 <i id="icon-left" class="ph ph-caret-left text-lg"></i>
             </button>
 
-            <!-- Wrapper per nascondere il contenuto in chiusura -->
             <div class="w-full flex-1 overflow-hidden relative">
-                <!-- Contenuto a larghezza fissa -->
                 <div class="w-80 h-full overflow-y-auto flex flex-col absolute top-0 left-0">
+                    
                     <!-- Strumenti -->
                     <div class="p-5 border-b border-gray-100">
                         <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Drawing Tools</h2>
+                        
                         <div class="flex gap-2 mb-2">
                             <button id="btn-mode-select" class="flex-1 py-2 px-3 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-semibold text-sm flex items-center justify-center gap-1 transition-colors">
                                 <i class="ph ph-cursor-click"></i> Select
+                            </button>
+                            <button id="btn-mode-pan" class="flex-1 py-2 px-3 rounded-md bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 font-semibold text-sm flex items-center justify-center gap-1 transition-colors">
+                                <i class="ph ph-hand-palm"></i> Pan
                             </button>
                         </div>
                         <div class="flex gap-2">
@@ -141,7 +146,7 @@
                             </button>
                         </div>
                         <p class="text-[11px] text-slate-500 mt-3 leading-tight" id="mode-hint">
-                            Selection mode: click to select, drag to move. Use Del/Backspace to delete.
+                            Selection mode: click to select, drag to move. Use Del/Backspace to delete. Ctrl+Z to Undo.
                         </p>
                     </div>
 
@@ -150,7 +155,6 @@
                         <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Selection Properties</h2>
                         <div id="panel-empty" class="text-sm text-slate-400 italic text-center py-4">No element selected.</div>
                         
-                        <!-- Proprietà Multipla -->
                         <div id="panel-multi" class="hidden flex flex-col gap-4 text-center py-4">
                             <span class="text-sm text-slate-600 font-semibold" id="multi-count">Multiple elements selected</span>
                             <button id="btn-delete-multi" class="w-full py-2 bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 rounded text-sm font-semibold flex items-center justify-center gap-1 mt-1 transition-colors">
@@ -158,7 +162,6 @@
                             </button>
                         </div>
 
-                        <!-- Proprietà Stato Singolo -->
                         <div id="panel-node" class="hidden flex flex-col gap-4">
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 mb-1">State Name</label>
@@ -179,7 +182,6 @@
                             </button>
                         </div>
 
-                        <!-- Proprietà Collegamento Singolo -->
                         <div id="panel-link" class="hidden flex flex-col gap-4">
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 mb-1">Transition Symbols (e.g. a, b)</label>
@@ -197,21 +199,28 @@
             </div>
         </aside>
 
-        <!-- Area di Disegno Centrale -->
-        <main class="flex-1 relative z-10" id="canvas-container">
-            <!-- SVG init via D3 -->
+        <!-- Area di Disegno Centrale con Controlli Zoom -->
+        <main class="flex-1 relative z-10 bg-slate-50" id="canvas-container">
+            
+            <!-- Pannello Zoom in basso a destra -->
+            <div class="absolute bottom-6 right-6 flex flex-col gap-2 z-20">
+                <div class="bg-white rounded-md shadow-md border border-gray-200 flex flex-col overflow-hidden">
+                    <button id="btn-zoom-in" class="p-2 hover:bg-gray-100 text-slate-700 border-b border-gray-200" title="Zoom In"><i class="ph ph-plus"></i></button>
+                    <button id="btn-zoom-reset" class="p-2 hover:bg-gray-100 text-slate-700 border-b border-gray-200 font-bold text-xs" title="Reset Zoom">1:1</button>
+                    <button id="btn-zoom-out" class="p-2 hover:bg-gray-100 text-slate-700" title="Zoom Out"><i class="ph ph-minus"></i></button>
+                </div>
+            </div>
+            
+            <!-- L'SVG viene creato da D3.js qui dentro -->
         </main>
 
         <!-- Sidebar DX: Simulazione -->
         <aside id="sidebar-right" class="w-80 bg-slate-50 border-l border-gray-200 shadow-lg z-20 transition-[width] duration-300 relative flex flex-col shrink-0">
-            <!-- Pulsante Toggle DX -->
             <button id="btn-toggle-right" class="absolute -left-8 top-1/2 transform -translate-y-1/2 bg-white border border-gray-200 border-r-0 rounded-l-md p-1.5 shadow-sm hover:bg-gray-50 z-30 flex items-center justify-center">
                 <i id="icon-right" class="ph ph-caret-right text-lg"></i>
             </button>
 
-            <!-- Wrapper per nascondere il contenuto in chiusura -->
             <div class="w-full flex-1 overflow-hidden relative">
-                <!-- Contenuto a larghezza fissa -->
                 <div class="w-80 h-full flex flex-col p-5 absolute top-0 right-0">
                     <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Simulation</h2>
                     
@@ -242,7 +251,6 @@
                         </button>
                     </div>
 
-                    <!-- Log Simulazione (Autoscroll) -->
                     <div id="sim-status" class="bg-white border border-slate-200 rounded p-3 text-sm flex-1 overflow-y-auto font-mono shadow-inner">
                         <span class="text-slate-400 italic">Waiting for input...</span>
                     </div>
@@ -275,7 +283,7 @@
 
     <!-- Logica Applicazione -->
     <script>
-        // --- Gestione Pannelli Laterali (Toggle) ---
+        // --- Sidebar Toggles ---
         const sidebarLeft = document.getElementById('sidebar-left');
         const iconLeft = document.getElementById('icon-left');
         document.getElementById('btn-toggle-left').addEventListener('click', () => {
@@ -300,7 +308,7 @@
             }
         });
 
-        // --- Costanti e Stato Globale ---
+        // --- Stato Globale e Dati ---
         const EPSILON = 'ε';
         const NODE_RADIUS = 26;
 
@@ -308,94 +316,135 @@
         let links = [];
         let nodeIdCounter = 0;
         
-        let mode = 'select';
+        let mode = 'select'; // select, pan, node, link
         
-        // Selezione Multipla
         let selectedNodes = new Set();
         let selectedLinks = new Set();
         
-        // Drag Box
+        // Drag Select Box
         let isSelecting = false;
         let selectionBox = { x1: 0, y1: 0, x2: 0, y2: 0 };
         
-        // Stato Simulazione
+        // Simulazione
         let isSimulating = false;
         let simString = "";
         let simIndex = 0;
         let activeStates = new Set();
-        
-        // --- Setup D3.js ---
+
+        // --- UNDO / REDO Stack ---
+        let undoStack = [];
+        let redoStack = [];
+
+        function serializeGraph() {
+            return {
+                nodeIdCounter: nodeIdCounter,
+                nodes: nodes.map(n => ({ ...n })),
+                links: links.map(l => ({ source: l.source.id, target: l.target.id, label: l.label }))
+            };
+        }
+
+        function deserializeGraph(state) {
+            nodeIdCounter = state.nodeIdCounter;
+            nodes = state.nodes.map(n => ({ ...n }));
+            links = state.links.map(l => {
+                return {
+                    source: nodes.find(n => n.id === l.source),
+                    target: nodes.find(n => n.id === l.target),
+                    label: l.label
+                };
+            });
+            clearSelection();
+            updateGraph();
+        }
+
+        function saveState() {
+            redoStack = []; // Se faccio una nuova azione, cancello il redo
+            undoStack.push(serializeGraph());
+            if (undoStack.length > 50) undoStack.shift(); // Max 50 azioni
+        }
+
+        function undo() {
+            if (isSimulating || undoStack.length === 0) return;
+            redoStack.push(serializeGraph());
+            let state = undoStack.pop();
+            deserializeGraph(state);
+            showMessage("Undo successful", "info");
+        }
+
+        function redo() {
+            if (isSimulating || redoStack.length === 0) return;
+            undoStack.push(serializeGraph());
+            let state = redoStack.pop();
+            deserializeGraph(state);
+            showMessage("Redo successful", "info");
+        }
+
+        // --- D3 Init e Spazio Infinito (Zoom/Pan) ---
         const container = document.getElementById('canvas-container');
         const svg = d3.select("#canvas-container").append("svg")
-            .attr("width", "100%")
-            .attr("height", "100%")
             .on("mousedown", handleSvgMouseDown)
             .on("mousemove", handleSvgMouseMove)
             .on("mouseup", handleSvgMouseUp)
             .on("mouseleave", handleSvgMouseUp)
             .on("click", handleSvgClick);
 
+        const zoomGroup = svg.append("g").attr("id", "zoom-group");
+
+        const zoomBehavior = d3.zoom()
+            .scaleExtent([0.1, 5])
+            .filter((event) => {
+                // Abilita lo zoom/pan se: è rotellina del mouse, o clic centrale (1), o siamo in modalità Pan con clic sx (0)
+                if (event.type === 'wheel') return true;
+                if (event.button === 1) return true; 
+                if (mode === 'pan' && event.button === 0) return true;
+                return false;
+            })
+            .on("zoom", (event) => {
+                zoomGroup.attr("transform", event.transform);
+            });
+
+        svg.call(zoomBehavior).on("dblclick.zoom", null); // Disabilita zoom su doppio click
+
+        // Pulsanti Zoom
+        document.getElementById('btn-zoom-in').addEventListener('click', () => svg.transition().call(zoomBehavior.scaleBy, 1.3));
+        document.getElementById('btn-zoom-out').addEventListener('click', () => svg.transition().call(zoomBehavior.scaleBy, 0.77));
+        document.getElementById('btn-zoom-reset').addEventListener('click', () => svg.transition().call(zoomBehavior.transform, d3.zoomIdentity));
+
+        // SVG Definizioni (Frecce)
         const defs = svg.append("defs");
-        
-        defs.append("marker")
-            .attr("id", "arrowhead")
-            .attr("viewBox", "-0 -5 10 10")
-            .attr("refX", NODE_RADIUS + 7)
-            .attr("refY", 0)
-            .attr("orient", "auto")
-            .attr("markerWidth", 7)
-            .attr("markerHeight", 7)
-            .attr("xoverflow", "visible")
-            .append("svg:path")
-            .attr("d", "M 0,-5 L 10 ,0 L 0,5")
-            .attr("fill", "#475569")
-            .style("stroke", "none");
+        defs.append("marker").attr("id", "arrowhead").attr("viewBox", "-0 -5 10 10").attr("refX", NODE_RADIUS + 7).attr("refY", 0).attr("orient", "auto").attr("markerWidth", 7).attr("markerHeight", 7).attr("xoverflow", "visible").append("svg:path").attr("d", "M 0,-5 L 10 ,0 L 0,5").attr("fill", "#475569").style("stroke", "none");
+        defs.append("marker").attr("id", "arrowhead-selected").attr("viewBox", "-0 -5 10 10").attr("refX", NODE_RADIUS + 7).attr("refY", 0).attr("orient", "auto").attr("markerWidth", 7).attr("markerHeight", 7).attr("xoverflow", "visible").append("svg:path").attr("d", "M 0,-5 L 10 ,0 L 0,5").attr("fill", "#0ea5e9").style("stroke", "none");
 
-        defs.append("marker")
-            .attr("id", "arrowhead-selected")
-            .attr("viewBox", "-0 -5 10 10")
-            .attr("refX", NODE_RADIUS + 7)
-            .attr("refY", 0)
-            .attr("orient", "auto")
-            .attr("markerWidth", 7)
-            .attr("markerHeight", 7)
-            .attr("xoverflow", "visible")
-            .append("svg:path")
-            .attr("d", "M 0,-5 L 10 ,0 L 0,5")
-            .attr("fill", "#0ea5e9")
-            .style("stroke", "none");
-
-        const linkGroup = svg.append("g").attr("class", "links");
-        const nodeGroup = svg.append("g").attr("class", "nodes");
+        const linkGroup = zoomGroup.append("g").attr("class", "links");
+        const nodeGroup = zoomGroup.append("g").attr("class", "nodes");
+        let dragLine = zoomGroup.append("path").attr("class", "dragline hidden").attr("d", "M0,0L0,0");
+        let selectionRect = zoomGroup.append("rect").attr("class", "selection-box hidden");
         
-        let dragLine = svg.append("path").attr("class", "dragline hidden").attr("d", "M0,0L0,0");
-        let selectionRect = svg.append("rect").attr("class", "selection-box hidden");
         let mousedownNode = null;
+        let dragSnapshot = null; // Snapshot temporaneo per l'undo del drag
 
-        // --- Gestione Selezione Rettangolare (Corretta) ---
+        // --- Gestione Mouse sul Canvas (Spazio trasformato) ---
         function handleSvgMouseDown(event) {
-            if (isSimulating || mode !== 'select' || event.target.tagName !== 'svg') return;
+            if (isSimulating || event.target.tagName !== 'svg') return;
+            if (mode === 'pan') return; // D3 lo gestisce da solo
             
-            let p = d3.pointer(event, svg.node());
-            isSelecting = true;
-            selectionBox.x1 = p[0];
-            selectionBox.y1 = p[1];
-            selectionBox.x2 = p[0];
-            selectionBox.y2 = p[1];
-            
-            if (!event.shiftKey) {
-                clearSelection();
+            if (mode === 'select') {
+                let p = d3.pointer(event, zoomGroup.node()); // Calcola coordinate corrette relative allo zoom
+                isSelecting = true;
+                selectionBox.x1 = p[0];
+                selectionBox.y1 = p[1];
+                selectionBox.x2 = p[0];
+                selectionBox.y2 = p[1];
+                
+                if (!event.shiftKey) clearSelection();
+                
+                selectionRect.attr("x", p[0]).attr("y", p[1]).attr("width", 0).attr("height", 0).classed("hidden", false);
             }
-            
-            selectionRect
-                .attr("x", p[0]).attr("y", p[1])
-                .attr("width", 0).attr("height", 0)
-                .classed("hidden", false);
         }
 
         function handleSvgMouseMove(event) {
             if (isSelecting) {
-                let p = d3.pointer(event, svg.node());
+                let p = d3.pointer(event, zoomGroup.node());
                 selectionBox.x2 = p[0];
                 selectionBox.y2 = p[1];
                 
@@ -404,9 +453,7 @@
                 let minY = Math.min(selectionBox.y1, selectionBox.y2);
                 let maxY = Math.max(selectionBox.y1, selectionBox.y2);
 
-                selectionRect
-                    .attr("x", minX).attr("y", minY)
-                    .attr("width", maxX - minX).attr("height", maxY - minY);
+                selectionRect.attr("x", minX).attr("y", minY).attr("width", maxX - minX).attr("height", maxY - minY);
             }
         }
 
@@ -426,31 +473,36 @@
                             selectedNodes.add(n);
                         }
                     });
-                    
                     links.forEach(l => {
-                        if (selectedNodes.has(l.source) && selectedNodes.has(l.target)) {
-                            selectedLinks.add(l);
-                        }
+                        if (selectedNodes.has(l.source) && selectedNodes.has(l.target)) selectedLinks.add(l);
                     });
-                    
                     updateGraph();
                 }
             }
         }
 
-        // --- Aggiornamento Grafica (D3) ---
+        function handleSvgClick(event) {
+            if (isSimulating || isSelecting) return;
+            
+            if (mode === 'node' && event.target.tagName === 'svg') {
+                saveState(); // Salva lo stato per l'Undo
+                let p = d3.pointer(event, zoomGroup.node());
+                addNode(p[0], p[1]);
+            } else if (mode === 'select' && event.target.tagName === 'svg') {
+                clearSelection();
+                updateGraph();
+            }
+        }
+
+        // --- Aggiornamento UI Grafica ---
         function updateGraph() {
             let linkElements = linkGroup.selectAll("g.link-group")
                 .data(links, d => d.source.id + "-" + d.target.id);
 
             linkElements.exit().remove();
+            let linkEnter = linkElements.enter().append("g").attr("class", "link-group");
 
-            let linkEnter = linkElements.enter().append("g")
-                .attr("class", "link-group");
-
-            linkEnter.append("path")
-                .attr("class", "link")
-                .attr("marker-end", "url(#arrowhead)")
+            linkEnter.append("path").attr("class", "link").attr("marker-end", "url(#arrowhead)")
                 .on("click", (event, d) => {
                     if (mode === 'select' && !isSimulating) {
                         if (!event.shiftKey) clearSelection();
@@ -460,18 +512,8 @@
                     }
                 });
 
-            linkEnter.append("text")
-                .attr("class", "link-label-bg")
-                .attr("text-anchor", "middle")
-                .attr("dy", -6)
-                .attr("stroke", "#f8fafc")
-                .attr("stroke-width", 5)
-                .attr("stroke-linejoin", "round");
-                
-            linkEnter.append("text")
-                .attr("class", "link-label")
-                .attr("text-anchor", "middle")
-                .attr("dy", -6);
+            linkEnter.append("text").attr("class", "link-label-bg").attr("text-anchor", "middle").attr("dy", -6).attr("stroke", "#f8fafc").attr("stroke-width", 5).attr("stroke-linejoin", "round");
+            linkEnter.append("text").attr("class", "link-label").attr("text-anchor", "middle").attr("dy", -6);
 
             linkElements = linkEnter.merge(linkElements);
 
@@ -481,22 +523,17 @@
                 .attr("d", calculateLinkPath);
 
             linkElements.select(".link-label")
-                .text(d => d.label)
-                .attr("x", d => getLabelPosition(d).x)
-                .attr("y", d => getLabelPosition(d).y);
+                .text(d => d.label).attr("x", d => getLabelPosition(d).x).attr("y", d => getLabelPosition(d).y);
                 
             linkElements.select(".link-label-bg")
-                .text(d => d.label)
-                .attr("x", d => getLabelPosition(d).x)
-                .attr("y", d => getLabelPosition(d).y);
+                .text(d => d.label).attr("x", d => getLabelPosition(d).x).attr("y", d => getLabelPosition(d).y);
 
             let nodeElements = nodeGroup.selectAll("g.node")
                 .data(nodes, d => d.id);
 
             nodeElements.exit().remove();
 
-            let nodeEnter = nodeElements.enter().append("g")
-                .attr("class", "node")
+            let nodeEnter = nodeElements.enter().append("g").attr("class", "node")
                 .call(d3.drag()
                     .on("start", dragstarted)
                     .on("drag", dragged)
@@ -511,30 +548,14 @@
                     event.stopPropagation();
                 });
 
-            nodeEnter.append("path")
-                .attr("class", "start-arrow")
-                .attr("d", `M ${-NODE_RADIUS - 35} 0 L ${-NODE_RADIUS - 2} 0 M ${-NODE_RADIUS - 12} -6 L ${-NODE_RADIUS - 2} 0 L ${-NODE_RADIUS - 12} 6`)
-                .attr("stroke", "#1e293b")
-                .attr("stroke-width", 2.5)
-                .attr("fill", "none")
-                .attr("stroke-linejoin", "round")
-                .attr("stroke-linecap", "round");
-
-            nodeEnter.append("circle")
-                .attr("class", "main-circle")
-                .attr("r", NODE_RADIUS);
-            
-            nodeEnter.append("circle")
-                .attr("class", "inner hidden")
-                .attr("r", NODE_RADIUS - 6);
-
-            nodeEnter.append("text")
-                .text(d => d.name);
+            nodeEnter.append("path").attr("class", "start-arrow").attr("d", `M ${-NODE_RADIUS - 35} 0 L ${-NODE_RADIUS - 2} 0 M ${-NODE_RADIUS - 12} -6 L ${-NODE_RADIUS - 2} 0 L ${-NODE_RADIUS - 12} 6`).attr("stroke", "#1e293b").attr("stroke-width", 2.5).attr("fill", "none").attr("stroke-linejoin", "round").attr("stroke-linecap", "round");
+            nodeEnter.append("circle").attr("class", "main-circle").attr("r", NODE_RADIUS);
+            nodeEnter.append("circle").attr("class", "inner hidden").attr("r", NODE_RADIUS - 6);
+            nodeEnter.append("text").text(d => d.name);
 
             nodeElements = nodeEnter.merge(nodeElements);
 
             nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
-            
             nodeElements.classed("selected", d => selectedNodes.has(d));
             nodeElements.classed("active", d => activeStates.has(d.id));
             nodeElements.classed("final", d => d.isFinal);
@@ -546,44 +567,33 @@
             updateSidebar();
         }
 
-        // --- Calcolo Posizioni e Curve ---
+        // Calcoli link paths
         function calculateLinkPath(d) {
-            if (d.source === d.target) {
-                let x = d.source.x;
-                let y = d.source.y;
-                return `M ${x - 8},${y - NODE_RADIUS + 2} C ${x - 30},${y - NODE_RADIUS - 40} ${x + 30},${y - NODE_RADIUS - 40} ${x + 8},${y - NODE_RADIUS + 2}`;
-            }
-            let bidirectional = links.find(l => l.source === d.target && l.target === d.source);
-            if (bidirectional) {
-                let dx = d.target.x - d.source.x;
-                let dy = d.target.y - d.source.y;
+            if (d.source === d.target) return `M ${d.source.x - 8},${d.source.y - NODE_RADIUS + 2} C ${d.source.x - 30},${d.source.y - NODE_RADIUS - 40} ${d.source.x + 30},${d.source.y - NODE_RADIUS - 40} ${d.source.x + 8},${d.source.y - NODE_RADIUS + 2}`;
+            let bidi = links.find(l => l.source === d.target && l.target === d.source);
+            if (bidi) {
+                let dx = d.target.x - d.source.x, dy = d.target.y - d.source.y;
                 let dr = Math.sqrt(dx * dx + dy * dy) * 1.5;
                 return `M ${d.source.x},${d.source.y} A ${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
-            } else {
-                return `M ${d.source.x},${d.source.y} L ${d.target.x},${d.target.y}`;
             }
+            return `M ${d.source.x},${d.source.y} L ${d.target.x},${d.target.y}`;
         }
-
         function getLabelPosition(d) {
-            if (d.source === d.target) {
-                return { x: d.source.x, y: d.source.y - NODE_RADIUS - 30 };
-            }
-            let bidirectional = links.find(l => l.source === d.target && l.target === d.source);
-            if (bidirectional) {
-                let dx = d.target.x - d.source.x;
-                let dy = d.target.y - d.source.y;
+            if (d.source === d.target) return { x: d.source.x, y: d.source.y - NODE_RADIUS - 30 };
+            let bidi = links.find(l => l.source === d.target && l.target === d.source);
+            if (bidi) {
+                let dx = d.target.x - d.source.x, dy = d.target.y - d.source.y;
                 let dr = Math.sqrt(dx * dx + dy * dy);
-                let offsetX = (dx / 2) - (dy / dr) * 20;
-                let offsetY = (dy / 2) + (dx / dr) * 20;
-                return { x: d.source.x + offsetX, y: d.source.y + offsetY };
-            } else {
-                return { x: (d.source.x + d.target.x) / 2, y: (d.source.y + d.target.y) / 2 };
+                return { x: d.source.x + (dx / 2) - (dy / dr) * 20, y: d.source.y + (dy / 2) + (dx / dr) * 20 };
             }
+            return { x: (d.source.x + d.target.x) / 2, y: (d.source.y + d.target.y) / 2 };
         }
 
-        // --- Logica Eventi Mouse / Drag sui nodi ---
+        // --- Logica Eventi Drag ---
         function dragstarted(event, d) {
             if (isSimulating) return;
+            dragSnapshot = serializeGraph(); // Snapshot prima dello spostamento
+
             if (mode === 'select') {
                 if (!selectedNodes.has(d)) {
                     if (!event.sourceEvent.shiftKey) clearSelection();
@@ -593,8 +603,7 @@
                 d3.select(this).raise();
             } else if (mode === 'link') {
                 mousedownNode = d;
-                dragLine.classed("hidden", false)
-                    .attr("d", `M${d.x},${d.y}L${d.x},${d.y}`);
+                dragLine.classed("hidden", false).attr("d", `M${d.x},${d.y}L${d.x},${d.y}`);
             }
         }
 
@@ -607,19 +616,28 @@
                 });
                 updateGraph();
             } else if (mode === 'link' && mousedownNode) {
-                let p = d3.pointer(event, container);
+                let p = d3.pointer(event, zoomGroup.node());
                 dragLine.attr("d", `M${mousedownNode.x},${mousedownNode.y}L${p[0]},${p[1]}`);
             }
         }
 
         function dragended(event, d) {
             if (isSimulating) return;
+            
+            // Salvataggio effettivo nello stack solo se il nodo si è mosso
+            if (mode === 'select' && dragSnapshot) {
+                let oldNode = dragSnapshot.nodes.find(n => n.id === d.id);
+                if (oldNode && (oldNode.x !== d.x || oldNode.y !== d.y)) {
+                    redoStack = [];
+                    undoStack.push(dragSnapshot);
+                }
+            }
+
             if (mode === 'link' && mousedownNode) {
                 dragLine.classed("hidden", true);
-                let p = d3.pointer(event, container);
+                let p = d3.pointer(event, zoomGroup.node());
                 let targetNode = nodes.find(n => {
-                    let dx = n.x - p[0];
-                    let dy = n.y - p[1];
+                    let dx = n.x - p[0], dy = n.y - p[1];
                     return (dx * dx + dy * dy) < (NODE_RADIUS * NODE_RADIUS * 3); 
                 });
                 
@@ -628,38 +646,20 @@
                 }
                 mousedownNode = null;
             }
+            dragSnapshot = null;
         }
 
-        function handleSvgClick(event) {
-            if (isSimulating) return;
-            if (isSelecting) return;
-            
-            if (mode === 'node' && event.target.tagName === 'svg') {
-                let p = d3.pointer(event);
-                addNode(p[0], p[1]);
-            } else if (mode === 'select' && event.target.tagName === 'svg') {
-                clearSelection();
-                updateGraph();
-            }
-        }
-
-        // --- Gestione Dati & Operazioni (Corretta) ---
+        // --- Gestione Dati e Operazioni ---
         function addNode(x, y) {
             let isFirst = nodes.length === 0;
-            let node = {
-                id: "q" + nodeIdCounter,
-                name: "q" + nodeIdCounter,
-                isStart: isFirst,
-                isFinal: false,
-                x: x,
-                y: y
-            };
+            let node = { id: "q" + nodeIdCounter, name: "q" + nodeIdCounter, isStart: isFirst, isFinal: false, x: x, y: y };
             nodeIdCounter++;
             nodes.push(node);
             clearSelection();
             selectedNodes.add(node);
-            setMode('select');
-            updateGraph(); // Aggiornamento UI inserito correttamente
+            
+            updateGraph();
+            setMode('select'); // Torna automaticamente alla modalità select!
         }
 
         let pendingLink = null;
@@ -693,19 +693,16 @@
         document.getElementById('modal-btn-ok').addEventListener('click', finalizeTransition);
         modalInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') finalizeTransition();
-            if (e.key === 'Escape') {
-                modal.classList.add('hidden');
-                pendingLink = null;
-            }
+            if (e.key === 'Escape') { modal.classList.add('hidden'); pendingLink = null; }
         });
 
         function finalizeTransition() {
             if (!pendingLink) return;
             let val = modalInput.value.replace(/\s+/g, '');
-            if (!val) {
-                showMessage("Enter at least one symbol (or Epsilon).", "error");
-                return;
-            }
+            if (!val) { showMessage("Enter at least one symbol.", "error"); return; }
+            
+            saveState(); // Salva lo stato prima di aggiungere il link
+
             let link = { source: pendingLink.source, target: pendingLink.target, label: val };
             links.push(link);
             modal.classList.add('hidden');
@@ -714,6 +711,7 @@
             clearSelection();
             selectedLinks.add(link);
             setMode('select'); 
+            updateGraph();
         }
 
         function clearSelection() {
@@ -722,17 +720,15 @@
         }
 
         function deleteSelected() {
-            if (isSimulating) return;
+            if (isSimulating || (selectedNodes.size === 0 && selectedLinks.size === 0)) return;
             
+            saveState(); // Salva per l'Undo
             let elementsDeleted = 0;
             
             if (selectedNodes.size > 0) {
                 links = links.filter(l => !selectedNodes.has(l.source) && !selectedNodes.has(l.target));
                 nodes = nodes.filter(n => !selectedNodes.has(n));
-                
-                if (!nodes.some(n => n.isStart) && nodes.length > 0) {
-                    nodes[0].isStart = true;
-                }
+                if (!nodes.some(n => n.isStart) && nodes.length > 0) nodes[0].isStart = true;
                 elementsDeleted += selectedNodes.size;
                 selectedNodes.clear();
             }
@@ -749,13 +745,56 @@
             }
         }
 
+        // Scorciatoie da tastiera globali (Delete, Undo, Redo)
         document.addEventListener('keydown', (e) => {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
             if (!modal.classList.contains('hidden')) return;
+            
+            // Undo: Ctrl+Z o Cmd+Z
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                undo();
+            }
+            // Redo: Ctrl+Y o Cmd+Y o Ctrl+Shift+Z
+            if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') || ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z')) {
+                e.preventDefault();
+                redo();
+            }
+
             if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
         });
 
-        // --- Aggiornamento UI Pannello Laterale ---
+        // --- Gestione Modalità GUI ---
+        function setMode(newMode) {
+            if (isSimulating) return;
+            mode = newMode;
+            
+            document.querySelectorAll('button[id^="btn-mode-"]').forEach(btn => {
+                btn.classList.remove('bg-blue-50', 'text-blue-700', 'border-blue-200');
+                btn.classList.add('bg-white', 'text-slate-600', 'border-slate-300');
+            });
+            let activeBtn = document.getElementById(`btn-mode-${mode}`);
+            activeBtn.classList.remove('bg-white', 'text-slate-600', 'border-slate-300');
+            activeBtn.classList.add('bg-blue-50', 'text-blue-700', 'border-blue-200');
+
+            let hint = "";
+            if (mode === 'select') hint = "Drag to select multiple. Use Del to delete. Ctrl+Z to Undo.";
+            else if (mode === 'pan') hint = "Drag to move the canvas. Use mouse wheel to zoom.";
+            else if (mode === 'node') hint = "Click on the workspace to create a new state.";
+            else if (mode === 'link') hint = "Drag from one state to another to create a transition.";
+            document.getElementById('mode-hint').innerText = hint;
+            
+            if (mode === 'pan') svg.style("cursor", "grab");
+            else if (mode === 'node') svg.style("cursor", "crosshair");
+            else svg.style("cursor", "default");
+        }
+
+        document.getElementById('btn-mode-select').addEventListener('click', () => setMode('select'));
+        document.getElementById('btn-mode-pan').addEventListener('click', () => setMode('pan'));
+        document.getElementById('btn-mode-node').addEventListener('click', () => setMode('node'));
+        document.getElementById('btn-mode-link').addEventListener('click', () => setMode('link'));
+
+        // --- Pannello Laterale e Proprietà ---
         function updateSidebar() {
             let totalSelected = selectedNodes.size + selectedLinks.size;
             
@@ -782,14 +821,12 @@
             }
         }
 
-        // Ascoltatori Sidebar Singola Modifica
-        document.getElementById('prop-node-name').addEventListener('input', (e) => {
-            if (selectedNodes.size === 1) { 
-                Array.from(selectedNodes)[0].name = e.target.value; updateGraph(); 
-            }
+        document.getElementById('prop-node-name').addEventListener('change', (e) => {
+            if (selectedNodes.size === 1) { saveState(); Array.from(selectedNodes)[0].name = e.target.value; updateGraph(); }
         });
         document.getElementById('prop-node-start').addEventListener('change', (e) => {
             if (selectedNodes.size === 1) {
+                saveState();
                 let node = Array.from(selectedNodes)[0];
                 if (e.target.checked) {
                     nodes.forEach(n => n.isStart = false); 
@@ -802,13 +839,12 @@
             }
         });
         document.getElementById('prop-node-final').addEventListener('change', (e) => {
-            if (selectedNodes.size === 1) { 
-                Array.from(selectedNodes)[0].isFinal = e.target.checked; updateGraph(); 
-            }
+            if (selectedNodes.size === 1) { saveState(); Array.from(selectedNodes)[0].isFinal = e.target.checked; updateGraph(); }
         });
 
-        document.getElementById('prop-link-label').addEventListener('input', (e) => {
+        document.getElementById('prop-link-label').addEventListener('change', (e) => {
             if (selectedLinks.size === 1) { 
+                saveState();
                 let val = e.target.value.replace(/\s+/g, '');
                 Array.from(selectedLinks)[0].label = val; 
                 updateGraph(); 
@@ -816,12 +852,12 @@
         });
         document.getElementById('btn-add-epsilon-panel').addEventListener('click', () => {
             if (selectedLinks.size === 1) {
+                saveState();
                 let link = Array.from(selectedLinks)[0];
                 let input = document.getElementById('prop-link-label');
                 let val = input.value;
                 val = val ? val + "," + EPSILON : EPSILON;
-                link.label = val;
-                input.value = val;
+                link.label = val; input.value = val;
                 updateGraph();
             }
         });
@@ -830,72 +866,41 @@
         document.getElementById('btn-delete-link').addEventListener('click', deleteSelected);
         document.getElementById('btn-delete-multi').addEventListener('click', deleteSelected);
 
-        // --- Gestione Modalità ---
-        function setMode(newMode) {
-            if (isSimulating) return;
-            mode = newMode;
-            
-            document.querySelectorAll('button[id^="btn-mode-"]').forEach(btn => {
-                btn.classList.remove('bg-blue-50', 'text-blue-700', 'border-blue-200');
-                btn.classList.add('bg-white', 'text-slate-600', 'border-slate-300');
-            });
-            let activeBtn = document.getElementById(`btn-mode-${mode}`);
-            activeBtn.classList.remove('bg-white', 'text-slate-600', 'border-slate-300');
-            activeBtn.classList.add('bg-blue-50', 'text-blue-700', 'border-blue-200');
-
-            let hint = "";
-            if (mode === 'select') hint = "Drag on the background to select multiple elements. Hold Shift to add to selection.";
-            else if (mode === 'node') hint = "Click on the workspace to create a new state.";
-            else if (mode === 'link') hint = "Drag from one state to another to create a transition.";
-            document.getElementById('mode-hint').innerText = hint;
-            
-            svg.style("cursor", mode === 'node' ? 'crosshair' : 'default');
+        function showMessage(msg, type="info") {
+            const box = document.getElementById('message-box');
+            box.innerText = msg;
+            box.className = type === 'error' 
+                ? "px-4 py-1.5 rounded text-white font-medium text-sm transition-opacity duration-300 bg-red-500 opacity-100"
+                : "px-4 py-1.5 rounded text-white font-medium text-sm transition-opacity duration-300 bg-slate-800 opacity-100";
+            setTimeout(() => { box.classList.remove('opacity-100'); box.classList.add('opacity-0'); }, 2000);
         }
 
-        document.getElementById('btn-mode-select').addEventListener('click', () => setMode('select'));
-        document.getElementById('btn-mode-node').addEventListener('click', () => setMode('node'));
-        document.getElementById('btn-mode-link').addEventListener('click', () => setMode('link'));
-
-        // --- Logica Simulazione ---
-        function getStartNode() {
-            return nodes.find(n => n.isStart);
-        }
-
+        // --- Logica Simulazione (Invariata) ---
+        function getStartNode() { return nodes.find(n => n.isStart); }
         function eClosure(stateIds) {
             let closure = new Set(stateIds);
             let stack = Array.from(stateIds);
-            
             while(stack.length > 0) {
                 let currentId = stack.pop();
                 let outgoingLinks = links.filter(l => l.source.id === currentId);
-                
                 for(let link of outgoingLinks) {
-                    let symbols = link.label.split(',').map(s => s.trim());
-                    if (symbols.includes(EPSILON)) {
-                        if (!closure.has(link.target.id)) {
-                            closure.add(link.target.id);
-                            stack.push(link.target.id);
-                        }
+                    if (link.label.split(',').map(s => s.trim()).includes(EPSILON)) {
+                        if (!closure.has(link.target.id)) { closure.add(link.target.id); stack.push(link.target.id); }
                     }
                 }
             }
             return closure;
         }
-
         function move(stateIds, symbol) {
             let nextStates = new Set();
             for(let id of stateIds) {
                 let outgoingLinks = links.filter(l => l.source.id === id);
                 for(let link of outgoingLinks) {
-                    let symbols = link.label.split(',').map(s => s.trim());
-                    if (symbols.includes(symbol)) {
-                        nextStates.add(link.target.id);
-                    }
+                    if (link.label.split(',').map(s => s.trim()).includes(symbol)) nextStates.add(link.target.id);
                 }
             }
             return nextStates;
         }
-
         function appendSimLog(text, type="normal") {
             const logDiv = document.getElementById('sim-status');
             const p = document.createElement('div');
@@ -903,17 +908,12 @@
             if (type === 'success') colorClass = "text-green-700 font-bold bg-green-50 p-1 rounded mt-2 border border-green-200";
             if (type === 'error') colorClass = "text-red-700 font-bold bg-red-50 p-1 rounded mt-2 border border-red-200";
             if (type === 'info') colorClass = "text-blue-700 font-semibold";
-            
             p.className = `mb-1 ${colorClass}`;
             p.innerHTML = text;
             logDiv.appendChild(p);
             logDiv.scrollTop = logDiv.scrollHeight; 
         }
-        
-        function clearSimLog() {
-            document.getElementById('sim-status').innerHTML = '';
-        }
-
+        function clearSimLog() { document.getElementById('sim-status').innerHTML = ''; }
         function checkAcceptance() {
             for(let id of activeStates) {
                 let n = nodes.find(x => x.id === id);
@@ -921,72 +921,49 @@
             }
             return false;
         }
-
         function validateInputAlphabet(inputStr) {
             let alphaStr = document.getElementById('sim-alphabet').value.replace(/\s+/g, '');
             if (!alphaStr) return true; 
             let alphabet = alphaStr.split(',');
             for (let char of inputStr) {
-                if (!alphabet.includes(char)) {
-                    showMessage(`Symbol '${char}' is not in the alphabet.`, "error");
-                    return false;
-                }
+                if (!alphabet.includes(char)) { showMessage(`Symbol '${char}' is not in the alphabet.`, "error"); return false; }
             }
             return true;
         }
 
-        // Simulazione Completa
         document.getElementById('btn-sim-quick').addEventListener('click', () => {
             if(nodes.length === 0) return showMessage("The automaton is empty.", "error");
             let startNode = getStartNode();
             if (!startNode) return showMessage("Missing start state.", "error");
-
             let inputStr = document.getElementById('sim-input').value;
             if (!validateInputAlphabet(inputStr)) return;
 
             clearSimLog();
             appendSimLog(`Quick test: <b>"${inputStr || 'ε'}"</b>`, "info");
-            
             activeStates = eClosure(new Set([startNode.id]));
             
             for(let i = 0; i < inputStr.length; i++) {
-                let char = inputStr[i];
-                let next = move(activeStates, char);
+                let next = move(activeStates, inputStr[i]);
                 activeStates = eClosure(next);
                 if (activeStates.size === 0) break; 
             }
-            
             updateGraph();
+            if (checkAcceptance()) appendSimLog("Result: String ACCEPTED.", "success");
+            else appendSimLog("Result: String REJECTED.", "error");
             
-            if (checkAcceptance()) {
-                appendSimLog("Result: String ACCEPTED.", "success");
-            } else {
-                appendSimLog("Result: String REJECTED.", "error");
-            }
-            
-            setTimeout(() => {
-                if(!isSimulating) {
-                    activeStates.clear();
-                    updateGraph();
-                }
-            }, 2500);
+            setTimeout(() => { if(!isSimulating) { activeStates.clear(); updateGraph(); } }, 2500);
         });
 
-        // Simulazione Step-by-Step
         document.getElementById('btn-sim-start-step').addEventListener('click', () => {
             if(nodes.length === 0) return showMessage("The automaton is empty.", "error");
             let startNode = getStartNode();
             if (!startNode) return showMessage("Missing start state.", "error");
-
             let inputStr = document.getElementById('sim-input').value;
             if (!validateInputAlphabet(inputStr)) return;
 
             isSimulating = true;
-            simString = inputStr;
-            simIndex = 0;
-            
-            clearSelection();
-            setMode('select'); 
+            simString = inputStr; simIndex = 0;
+            clearSelection(); setMode('select'); 
 
             document.getElementById('btn-sim-start-step').classList.add('hidden');
             document.getElementById('btn-sim-quick').classList.add('hidden');
@@ -997,79 +974,46 @@
 
             clearSimLog();
             appendSimLog(`Starting Step-by-Step. Input: <b>"${simString || 'ε'}"</b>`, "info");
-            
             activeStates = eClosure(new Set([startNode.id]));
-            
             let stateNames = Array.from(activeStates).map(id => nodes.find(n=>n.id===id).name).join(', ');
             appendSimLog(`Initialization (with e-closure): States { ${stateNames} }`);
             updateGraph();
-            
             if (simString.length === 0) evaluteFinalStep();
         });
 
         document.getElementById('btn-sim-next').addEventListener('click', () => {
             if (!isSimulating) return;
-
             let char = simString[simIndex];
             appendSimLog(`Reading symbol: <b>'${char}'</b>`);
-            
             let moved = move(activeStates, char);
             activeStates = eClosure(moved);
             
             if (activeStates.size === 0) {
-                appendSimLog(`No valid transition. Automaton blocked (trap state).`, "error");
-                evaluteFinalStep();
-                updateGraph();
-                return;
+                appendSimLog(`No valid transition. Automaton blocked.`, "error");
+                evaluteFinalStep(); updateGraph(); return;
             } 
             
             let stateNames = Array.from(activeStates).map(id => nodes.find(n=>n.id===id).name).join(', ');
             appendSimLog(`New active states: { ${stateNames} }`);
-            
-            simIndex++;
-            updateGraph();
-
+            simIndex++; updateGraph();
             if (simIndex >= simString.length) evaluteFinalStep();
         });
 
         function evaluteFinalStep() {
-            if (checkAcceptance()) {
-                appendSimLog("End of string. <b>ACCEPTED</b>", "success");
-            } else {
-                appendSimLog("End of string. <b>REJECTED</b>", "error");
-            }
+            if (checkAcceptance()) appendSimLog("End of string. <b>ACCEPTED</b>", "success");
+            else appendSimLog("End of string. <b>REJECTED</b>", "error");
             document.getElementById('btn-sim-next').classList.add('opacity-50');
             document.getElementById('btn-sim-next').disabled = true;
         }
 
         document.getElementById('btn-sim-stop').addEventListener('click', () => {
-            isSimulating = false;
-            activeStates.clear();
-            updateGraph();
-            
+            isSimulating = false; activeStates.clear(); updateGraph();
             document.getElementById('btn-sim-start-step').classList.remove('hidden');
             document.getElementById('btn-sim-quick').classList.remove('hidden');
             document.getElementById('btn-sim-stop').classList.add('hidden');
             document.getElementById('btn-sim-next').classList.add('hidden');
-            
             appendSimLog("Simulation stopped.");
         });
-
-        function showMessage(msg, type="info") {
-            const box = document.getElementById('message-box');
-            box.innerText = msg;
-            
-            if(type === 'error') {
-                box.className = "px-4 py-1.5 rounded text-white font-medium text-sm transition-opacity duration-300 bg-red-500 opacity-100";
-            } else {
-                box.className = "px-4 py-1.5 rounded text-white font-medium text-sm transition-opacity duration-300 bg-slate-800 opacity-100";
-            }
-            
-            setTimeout(() => { 
-                box.classList.remove('opacity-100'); 
-                box.classList.add('opacity-0'); 
-            }, 3000);
-        }
 
         updateGraph();
     </script>
