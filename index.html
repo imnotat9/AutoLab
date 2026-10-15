@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simulatore Automi (DFA, NFA, e-NFA)</title>
+    <title>Automaton Simulator (DFA, NFA, e-NFA)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- D3.js -->
@@ -28,7 +28,7 @@
             transition: fill 0.2s, stroke 0.2s, stroke-width 0.2s;
         }
         .node.selected circle {
-            stroke: #ea580c;
+            stroke: #0ea5e9; /* Sky 500 per selezione multipla e singola */
             stroke-width: 3.5px;
         }
         .node.active circle.main-circle {
@@ -42,7 +42,7 @@
             display: block;
         }
         .node.final.selected circle.inner {
-            stroke: #ea580c;
+            stroke: #0ea5e9;
         }
         .node.final.active circle.inner {
             stroke: #166534;
@@ -65,7 +65,7 @@
             transition: stroke 0.2s, stroke-width 0.2s;
         }
         .link.selected {
-            stroke: #ea580c;
+            stroke: #0ea5e9;
             stroke-width: 3.5px;
         }
         .link-label {
@@ -85,6 +85,14 @@
             stroke-width: 2px;
             stroke-dasharray: 5,5;
         }
+
+        /* Selection Box (Rettangolo Azzurro) */
+        .selection-box {
+            fill: rgba(14, 165, 233, 0.15);
+            stroke: rgba(14, 165, 233, 0.6);
+            stroke-width: 1px;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body class="bg-gray-100 h-screen flex flex-col overflow-hidden text-slate-800">
@@ -93,7 +101,7 @@
     <header class="bg-slate-900 text-white px-6 py-3 flex justify-between items-center z-30 shadow-md">
         <h1 class="text-xl font-bold flex items-center gap-2">
             <i class="ph ph-graph"></i>
-            Simulatore Automi a Stati Finiti
+            Finite State Automaton Simulator
         </h1>
         <div id="message-box" class="opacity-0 px-4 py-1.5 rounded bg-blue-500 text-white font-medium text-sm transition-opacity duration-300">
             <!-- Messaggi temporanei -->
@@ -104,73 +112,84 @@
     <div class="flex flex-1 overflow-hidden relative">
         
         <!-- Sidebar SX: Controlli e Strumenti -->
-        <aside id="sidebar-left" class="w-80 bg-white border-r border-gray-200 shadow-lg z-20 transition-[width] duration-300 relative flex flex-col">
+        <aside id="sidebar-left" class="w-80 bg-white border-r border-gray-200 shadow-lg z-20 transition-[width] duration-300 relative flex flex-col shrink-0">
             <!-- Pulsante Toggle SX -->
             <button id="btn-toggle-left" class="absolute -right-8 top-1/2 transform -translate-y-1/2 bg-white border border-gray-200 border-l-0 rounded-r-md p-1.5 shadow-sm hover:bg-gray-50 z-30 flex items-center justify-center">
                 <i id="icon-left" class="ph ph-caret-left text-lg"></i>
             </button>
 
-            <!-- Contenuto Sidebar SX -->
-            <div class="w-80 flex-1 overflow-y-auto flex flex-col">
-                <!-- Strumenti -->
-                <div class="p-5 border-b border-gray-100">
-                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Strumenti di Disegno</h2>
-                    <div class="flex gap-2 mb-2">
-                        <button id="btn-mode-select" class="flex-1 py-2 px-3 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-semibold text-sm flex items-center justify-center gap-1 transition-colors">
-                            <i class="ph ph-cursor-click"></i> Seleziona
-                        </button>
-                    </div>
-                    <div class="flex gap-2">
-                        <button id="btn-mode-node" class="flex-1 py-2 px-3 rounded-md bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 font-semibold text-sm flex items-center justify-center gap-1 transition-colors">
-                            <i class="ph ph-circle-plus"></i> Stato
-                        </button>
-                        <button id="btn-mode-link" class="flex-1 py-2 px-3 rounded-md bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 font-semibold text-sm flex items-center justify-center gap-1 transition-colors">
-                            <i class="ph ph-arrow-right"></i> Collega
-                        </button>
-                    </div>
-                    <p class="text-[11px] text-slate-500 mt-3 leading-tight" id="mode-hint">
-                        Modalità selezione: clicca per selezionare, trascina per muovere. Usa Canc/Backspace per eliminare.
-                    </p>
-                </div>
-
-                <!-- Proprietà -->
-                <div class="p-5 border-b border-gray-100 flex-1">
-                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Proprietà Selezione</h2>
-                    <div id="panel-empty" class="text-sm text-slate-400 italic text-center py-4">Nessun elemento selezionato.</div>
-                    
-                    <!-- Proprietà Stato -->
-                    <div id="panel-node" class="hidden flex flex-col gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Nome Stato</label>
-                            <input type="text" id="prop-node-name" class="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+            <!-- Wrapper per nascondere il contenuto in chiusura -->
+            <div class="w-full flex-1 overflow-hidden relative">
+                <!-- Contenuto a larghezza fissa (absolute per non deformarsi) -->
+                <div class="w-80 h-full overflow-y-auto flex flex-col absolute top-0 left-0">
+                    <!-- Strumenti -->
+                    <div class="p-5 border-b border-gray-100">
+                        <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Drawing Tools</h2>
+                        <div class="flex gap-2 mb-2">
+                            <button id="btn-mode-select" class="flex-1 py-2 px-3 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-semibold text-sm flex items-center justify-center gap-1 transition-colors">
+                                <i class="ph ph-cursor-click"></i> Select
+                            </button>
                         </div>
-                        <div class="flex flex-col gap-2">
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" id="prop-node-start" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                                <span class="text-sm text-slate-700 font-medium">Stato Iniziale</span>
-                            </label>
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" id="prop-node-final" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                                <span class="text-sm text-slate-700 font-medium">Stato Finale</span>
-                            </label>
+                        <div class="flex gap-2">
+                            <button id="btn-mode-node" class="flex-1 py-2 px-3 rounded-md bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 font-semibold text-sm flex items-center justify-center gap-1 transition-colors">
+                                <i class="ph ph-circle-plus"></i> State
+                            </button>
+                            <button id="btn-mode-link" class="flex-1 py-2 px-3 rounded-md bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 font-semibold text-sm flex items-center justify-center gap-1 transition-colors">
+                                <i class="ph ph-arrow-right"></i> Transition
+                            </button>
                         </div>
-                        <button id="btn-delete-node" class="text-sm text-red-600 hover:text-red-800 text-left font-semibold flex items-center gap-1 mt-1">
-                            <i class="ph ph-trash"></i> Elimina Stato (Canc)
-                        </button>
+                        <p class="text-[11px] text-slate-500 mt-3 leading-tight" id="mode-hint">
+                            Selection mode: click to select, drag to move. Use Del/Backspace to delete.
+                        </p>
                     </div>
 
-                    <!-- Proprietà Collegamento -->
-                    <div id="panel-link" class="hidden flex flex-col gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Simboli Transizione (es. a, b)</label>
-                            <div class="flex gap-2">
-                                <input type="text" id="prop-link-label" class="flex-1 border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                                <button id="btn-add-epsilon-panel" class="px-3 py-1.5 bg-slate-100 border border-slate-300 rounded text-sm hover:bg-slate-200 font-medium" title="Aggiungi Epsilon">ε</button>
+                    <!-- Proprietà -->
+                    <div class="p-5 border-b border-gray-100 flex-1">
+                        <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Selection Properties</h2>
+                        <div id="panel-empty" class="text-sm text-slate-400 italic text-center py-4">No element selected.</div>
+                        
+                        <!-- Proprietà Multipla -->
+                        <div id="panel-multi" class="hidden flex flex-col gap-4 text-center py-4">
+                            <span class="text-sm text-slate-600 font-semibold" id="multi-count">Multiple elements selected</span>
+                            <button id="btn-delete-multi" class="w-full py-2 bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 rounded text-sm font-semibold flex items-center justify-center gap-1 mt-1 transition-colors">
+                                <i class="ph ph-trash"></i> Delete Selected (Del)
+                            </button>
+                        </div>
+
+                        <!-- Proprietà Stato Singolo -->
+                        <div id="panel-node" class="hidden flex flex-col gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">State Name</label>
+                                <input type="text" id="prop-node-name" class="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                             </div>
+                            <div class="flex flex-col gap-2">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="prop-node-start" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                    <span class="text-sm text-slate-700 font-medium">Start State</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="prop-node-final" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                    <span class="text-sm text-slate-700 font-medium">Final State</span>
+                                </label>
+                            </div>
+                            <button id="btn-delete-node" class="text-sm text-red-600 hover:text-red-800 text-left font-semibold flex items-center gap-1 mt-1">
+                                <i class="ph ph-trash"></i> Delete State (Del)
+                            </button>
                         </div>
-                        <button id="btn-delete-link" class="text-sm text-red-600 hover:text-red-800 text-left font-semibold flex items-center gap-1 mt-1">
-                            <i class="ph ph-trash"></i> Elimina Collegamento (Canc)
-                        </button>
+
+                        <!-- Proprietà Collegamento Singolo -->
+                        <div id="panel-link" class="hidden flex flex-col gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Transition Symbols (e.g. a, b)</label>
+                                <div class="flex gap-2">
+                                    <input type="text" id="prop-link-label" class="flex-1 border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                    <button id="btn-add-epsilon-panel" class="px-3 py-1.5 bg-slate-100 border border-slate-300 rounded text-sm hover:bg-slate-200 font-medium" title="Add Epsilon">ε</button>
+                                </div>
+                            </div>
+                            <button id="btn-delete-link" class="text-sm text-red-600 hover:text-red-800 text-left font-semibold flex items-center gap-1 mt-1">
+                                <i class="ph ph-trash"></i> Delete Transition (Del)
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -182,46 +201,49 @@
         </main>
 
         <!-- Sidebar DX: Simulazione -->
-        <aside id="sidebar-right" class="w-80 bg-slate-50 border-l border-gray-200 shadow-lg z-20 transition-[width] duration-300 relative flex flex-col">
+        <aside id="sidebar-right" class="w-80 bg-slate-50 border-l border-gray-200 shadow-lg z-20 transition-[width] duration-300 relative flex flex-col shrink-0">
             <!-- Pulsante Toggle DX -->
             <button id="btn-toggle-right" class="absolute -left-8 top-1/2 transform -translate-y-1/2 bg-white border border-gray-200 border-r-0 rounded-l-md p-1.5 shadow-sm hover:bg-gray-50 z-30 flex items-center justify-center">
                 <i id="icon-right" class="ph ph-caret-right text-lg"></i>
             </button>
 
-            <!-- Contenuto Sidebar DX -->
-            <div class="w-80 flex-1 flex flex-col p-5 overflow-hidden">
-                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Simulazione</h2>
-                
-                <div class="mb-3 shrink-0">
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Alfabeto (opzionale, es. a,b)</label>
-                    <input type="text" id="sim-alphabet" class="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500" placeholder="Lascia vuoto per libere">
-                </div>
+            <!-- Wrapper per nascondere il contenuto in chiusura -->
+            <div class="w-full flex-1 overflow-hidden relative">
+                <!-- Contenuto a larghezza fissa (absolute right-0 per allinearsi correttamente) -->
+                <div class="w-80 h-full flex flex-col p-5 absolute top-0 right-0">
+                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Simulation</h2>
+                    
+                    <div class="mb-3 shrink-0">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Alphabet (optional, e.g. a,b)</label>
+                        <input type="text" id="sim-alphabet" class="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500" placeholder="Leave empty for free input">
+                    </div>
 
-                <div class="mb-4 shrink-0">
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Stringa in Input</label>
-                    <input type="text" id="sim-input" class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500 font-mono" placeholder="Inserisci stringa...">
-                </div>
+                    <div class="mb-4 shrink-0">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Input String</label>
+                        <input type="text" id="sim-input" class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500 font-mono" placeholder="Enter string...">
+                    </div>
 
-                <div class="flex flex-col gap-2 mb-4 shrink-0">
-                    <button id="btn-sim-quick" class="w-full py-2 bg-blue-600 text-white rounded font-semibold text-sm hover:bg-blue-700 transition flex justify-center items-center gap-2">
-                        <i class="ph ph-lightning"></i> Simulazione Completa
-                    </button>
-                    <div class="flex gap-2">
-                        <button id="btn-sim-start-step" class="flex-1 py-2 bg-slate-800 text-white rounded font-semibold text-sm hover:bg-slate-900 transition flex justify-center items-center gap-1">
-                            <i class="ph ph-play"></i> Step by Step
+                    <div class="flex flex-col gap-2 mb-4 shrink-0">
+                        <button id="btn-sim-quick" class="w-full py-2 bg-blue-600 text-white rounded font-semibold text-sm hover:bg-blue-700 transition flex justify-center items-center gap-2">
+                            <i class="ph ph-lightning"></i> Quick Simulation
                         </button>
-                        <button id="btn-sim-stop" class="hidden flex-1 py-2 bg-red-100 text-red-700 border border-red-200 rounded font-semibold text-sm hover:bg-red-200 transition flex justify-center items-center gap-1">
-                            <i class="ph ph-stop"></i> Ferma
+                        <div class="flex gap-2">
+                            <button id="btn-sim-start-step" class="flex-1 py-2 bg-slate-800 text-white rounded font-semibold text-sm hover:bg-slate-900 transition flex justify-center items-center gap-1">
+                                <i class="ph ph-play"></i> Step by Step
+                            </button>
+                            <button id="btn-sim-stop" class="hidden flex-1 py-2 bg-red-100 text-red-700 border border-red-200 rounded font-semibold text-sm hover:bg-red-200 transition flex justify-center items-center gap-1">
+                                <i class="ph ph-stop"></i> Stop
+                            </button>
+                        </div>
+                        <button id="btn-sim-next" class="hidden w-full py-2 bg-green-100 text-green-800 border border-green-300 rounded font-bold text-sm hover:bg-green-200 transition flex justify-center items-center gap-1">
+                            Next Step <i class="ph ph-arrow-right-bold"></i>
                         </button>
                     </div>
-                    <button id="btn-sim-next" class="hidden w-full py-2 bg-green-100 text-green-800 border border-green-300 rounded font-bold text-sm hover:bg-green-200 transition flex justify-center items-center gap-1">
-                        Passo Successivo <i class="ph ph-arrow-right-bold"></i>
-                    </button>
-                </div>
 
-                <!-- Log Simulazione (Autoscroll) -->
-                <div id="sim-status" class="bg-white border border-slate-200 rounded p-3 text-sm flex-1 overflow-y-auto font-mono shadow-inner">
-                    <span class="text-slate-400 italic">In attesa di input...</span>
+                    <!-- Log Simulazione (Autoscroll) -->
+                    <div id="sim-status" class="bg-white border border-slate-200 rounded p-3 text-sm flex-1 overflow-y-auto font-mono shadow-inner">
+                        <span class="text-slate-400 italic">Waiting for input...</span>
+                    </div>
                 </div>
             </div>
         </aside>
@@ -231,20 +253,20 @@
     <div id="modal-transition" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50">
         <div class="bg-white rounded-lg shadow-xl w-80 overflow-hidden transform transition-all">
             <div class="px-5 py-4 border-b border-slate-100">
-                <h3 class="text-lg font-bold text-slate-800">Nuova Transizione</h3>
-                <p class="text-xs text-slate-500 mt-1">Inserisci i simboli separati da virgola.</p>
+                <h3 class="text-lg font-bold text-slate-800">New Transition</h3>
+                <p class="text-xs text-slate-500 mt-1">Enter comma-separated symbols.</p>
             </div>
             <div class="p-5">
-                <input type="text" id="modal-input" class="w-full border border-slate-300 rounded px-3 py-2 text-base focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-shadow mb-3" placeholder="es. a, b" autocomplete="off">
+                <input type="text" id="modal-input" class="w-full border border-slate-300 rounded px-3 py-2 text-base focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-shadow mb-3" placeholder="e.g. a, b" autocomplete="off">
                 <div class="flex gap-2">
                     <button id="modal-btn-epsilon" class="py-1 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-sm font-semibold border border-slate-200">
-                        Inserisci Epsilon (ε)
+                        Insert Epsilon (ε)
                     </button>
                 </div>
             </div>
             <div class="bg-slate-50 px-5 py-3 flex justify-end gap-2 border-t border-slate-100">
-                <button id="modal-btn-cancel" class="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded font-semibold text-sm transition-colors">Annulla</button>
-                <button id="modal-btn-ok" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold text-sm transition-colors">Conferma</button>
+                <button id="modal-btn-cancel" class="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded font-semibold text-sm transition-colors">Cancel</button>
+                <button id="modal-btn-ok" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold text-sm transition-colors">Confirm</button>
             </div>
         </div>
     </div>
@@ -285,8 +307,14 @@
         let nodeIdCounter = 0;
         
         let mode = 'select'; // 'select', 'node', 'link'
-        let selectedNode = null;
-        let selectedLink = null;
+        
+        // Selezione Multipla
+        let selectedNodes = new Set();
+        let selectedLinks = new Set();
+        
+        // Drag Box (Rettangolo di Selezione)
+        let isSelecting = false;
+        let selectionBox = { x1: 0, y1: 0, x2: 0, y2: 0 };
         
         // Stato Simulazione
         let isSimulating = false;
@@ -299,6 +327,10 @@
         const svg = d3.select("#canvas-container").append("svg")
             .attr("width", "100%")
             .attr("height", "100%")
+            .on("mousedown", handleSvgMouseDown)
+            .on("mousemove", handleSvgMouseMove)
+            .on("mouseup", handleSvgMouseUp)
+            .on("mouseleave", handleSvgMouseUp)
             .on("click", handleSvgClick);
 
         const defs = svg.append("defs");
@@ -328,17 +360,85 @@
             .attr("xoverflow", "visible")
             .append("svg:path")
             .attr("d", "M 0,-5 L 10 ,0 L 0,5")
-            .attr("fill", "#ea580c")
+            .attr("fill", "#0ea5e9") // Sky 500
             .style("stroke", "none");
 
         const linkGroup = svg.append("g").attr("class", "links");
         const nodeGroup = svg.append("g").attr("class", "nodes");
         
-        let dragLine = svg.append("path")
-            .attr("class", "dragline hidden")
-            .attr("d", "M0,0L0,0");
-
+        // Elementi grafici temporanei
+        let dragLine = svg.append("path").attr("class", "dragline hidden").attr("d", "M0,0L0,0");
+        let selectionRect = svg.append("rect").attr("class", "selection-box hidden");
         let mousedownNode = null;
+
+        // --- Gestione Selezione Rettangolare ---
+        function handleSvgMouseDown(event) {
+            if (isSimulating || mode !== 'select' || event.target.tagName !== 'svg') return;
+            
+            // Inizia la selezione a scatola
+            let p = d3.pointer(event);
+            isSelecting = true;
+            selectionBox.x1 = p[0];
+            selectionBox.y1 = p[1];
+            selectionBox.x2 = p[0];
+            selectionBox.y2 = p[1];
+            
+            if (!event.shiftKey) {
+                clearSelection();
+            }
+            
+            selectionRect
+                .attr("x", p[0]).attr("y", p[1])
+                .attr("width", 0).attr("height", 0)
+                .classed("hidden", false);
+        }
+
+        function handleSvgMouseMove(event) {
+            if (isSelecting) {
+                let p = d3.pointer(event);
+                selectionBox.x2 = p[0];
+                selectionBox.y2 = p[1];
+                
+                let minX = Math.min(selectionBox.x1, selectionBox.x2);
+                let maxX = Math.max(selectionBox.x1, selectionBox.x2);
+                let minY = Math.min(selectionBox.y1, selectionBox.y2);
+                let maxY = Math.max(selectionBox.y1, selectionBox.y2);
+
+                selectionRect
+                    .attr("x", minX).attr("y", minY)
+                    .attr("width", maxX - minX).attr("height", maxY - minY);
+            }
+        }
+
+        function handleSvgMouseUp(event) {
+            if (isSelecting) {
+                isSelecting = false;
+                selectionRect.classed("hidden", true);
+                
+                let minX = Math.min(selectionBox.x1, selectionBox.x2);
+                let maxX = Math.max(selectionBox.x1, selectionBox.x2);
+                let minY = Math.min(selectionBox.y1, selectionBox.y2);
+                let maxY = Math.max(selectionBox.y1, selectionBox.y2);
+                
+                // Evita click involontari se il trascinamento è stato nullo
+                if (maxX - minX > 5 || maxY - minY > 5) {
+                    nodes.forEach(n => {
+                        if (n.x >= minX && n.x <= maxX && n.y >= minY && n.y <= maxY) {
+                            selectedNodes.add(n);
+                        }
+                    });
+                    
+                    // Seleziona anche i collegamenti se entrambi gli estremi sono nel rettangolo
+                    links.forEach(l => {
+                        if (selectedNodes.has(l.source) && selectedNodes.has(l.target)) {
+                            selectedLinks.add(l);
+                        }
+                    });
+                    
+                    updateGraph();
+                }
+            }
+        }
 
         // --- Aggiornamento Grafica (D3) ---
         function updateGraph() {
@@ -355,7 +455,9 @@
                 .attr("marker-end", "url(#arrowhead)")
                 .on("click", (event, d) => {
                     if (mode === 'select' && !isSimulating) {
-                        selectLink(d);
+                        if (!event.shiftKey) clearSelection();
+                        selectedLinks.add(d);
+                        updateGraph();
                         event.stopPropagation();
                     }
                 });
@@ -376,8 +478,8 @@
             linkElements = linkEnter.merge(linkElements);
 
             linkElements.select("path")
-                .classed("selected", d => d === selectedLink)
-                .attr("marker-end", d => d === selectedLink ? "url(#arrowhead-selected)" : "url(#arrowhead)")
+                .classed("selected", d => selectedLinks.has(d))
+                .attr("marker-end", d => selectedLinks.has(d) ? "url(#arrowhead-selected)" : "url(#arrowhead)")
                 .attr("d", calculateLinkPath);
 
             linkElements.select(".link-label")
@@ -404,7 +506,9 @@
                 .on("click", (event, d) => {
                     if (isSimulating) return;
                     if (mode === 'select') {
-                        selectNode(d);
+                        if (!event.shiftKey && !selectedNodes.has(d)) clearSelection();
+                        selectedNodes.add(d);
+                        updateGraph();
                     }
                     event.stopPropagation();
                 });
@@ -433,7 +537,7 @@
 
             nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
             
-            nodeElements.classed("selected", d => d === selectedNode);
+            nodeElements.classed("selected", d => selectedNodes.has(d));
             nodeElements.classed("active", d => activeStates.has(d.id));
             nodeElements.classed("final", d => d.isFinal);
             
@@ -479,10 +583,15 @@
             }
         }
 
-        // --- Logica Eventi Mouse / Drag ---
+        // --- Logica Eventi Mouse / Drag sui nodi ---
         function dragstarted(event, d) {
             if (isSimulating) return;
             if (mode === 'select') {
+                if (!selectedNodes.has(d)) {
+                    if (!event.sourceEvent.shiftKey) clearSelection();
+                    selectedNodes.add(d);
+                    updateGraph();
+                }
                 d3.select(this).raise();
             } else if (mode === 'link') {
                 mousedownNode = d;
@@ -494,8 +603,11 @@
         function dragged(event, d) {
             if (isSimulating) return;
             if (mode === 'select') {
-                d.x = event.x;
-                d.y = event.y;
+                // Muovi tutti i nodi selezionati
+                selectedNodes.forEach(node => {
+                    node.x += event.dx;
+                    node.y += event.dy;
+                });
                 updateGraph();
             } else if (mode === 'link' && mousedownNode) {
                 let p = d3.pointer(event, container);
@@ -523,12 +635,15 @@
 
         function handleSvgClick(event) {
             if (isSimulating) return;
-            if (mode === 'node') {
+            // Se eravamo in selezione a box e abbiamo finito, ignora il click
+            if (isSelecting) return;
+            
+            if (mode === 'node' && event.target.tagName === 'svg') {
                 let p = d3.pointer(event);
                 addNode(p[0], p[1]);
-            } else if (mode === 'select') {
-                selectNode(null);
-                selectLink(null);
+            } else if (mode === 'select' && event.target.tagName === 'svg') {
+                clearSelection();
+                updateGraph();
             }
         }
 
@@ -545,7 +660,8 @@
             };
             nodeIdCounter++;
             nodes.push(node);
-            selectNode(node);
+            clearSelection();
+            selectedNodes.add(node);
             setMode('select');
         }
 
@@ -556,7 +672,9 @@
         function promptForTransition(source, target) {
             let existing = links.find(l => l.source === source && l.target === target);
             if (existing) {
-                selectLink(existing);
+                clearSelection();
+                selectedLinks.add(existing);
+                updateGraph();
                 return;
             }
             pendingLink = { source, target };
@@ -588,31 +706,52 @@
             if (!pendingLink) return;
             let val = modalInput.value.replace(/\s+/g, '');
             if (!val) {
-                showMessage("Inserisci almeno un simbolo (oppure Epsilon).", "error");
+                showMessage("Enter at least one symbol (or Epsilon).", "error");
                 return;
             }
             let link = { source: pendingLink.source, target: pendingLink.target, label: val };
             links.push(link);
             modal.classList.add('hidden');
             pendingLink = null;
-            selectLink(link);
+            
+            clearSelection();
+            selectedLinks.add(link);
             setMode('select'); 
+        }
+
+        function clearSelection() {
+            selectedNodes.clear();
+            selectedLinks.clear();
         }
 
         function deleteSelected() {
             if (isSimulating) return;
-            if (selectedNode) {
-                links = links.filter(l => l.source !== selectedNode && l.target !== selectedNode);
-                nodes = nodes.filter(n => n !== selectedNode);
-                if (selectedNode.isStart && nodes.length > 0) nodes[0].isStart = true;
-                selectedNode = null;
+            
+            let elementsDeleted = 0;
+            
+            if (selectedNodes.size > 0) {
+                // Rimuovi link associati ai nodi da eliminare
+                links = links.filter(l => !selectedNodes.has(l.source) && !selectedNodes.has(l.target));
+                // Rimuovi nodi
+                nodes = nodes.filter(n => !selectedNodes.has(n));
+                
+                // Fix stato iniziale
+                if (!nodes.some(n => n.isStart) && nodes.length > 0) {
+                    nodes[0].isStart = true;
+                }
+                elementsDeleted += selectedNodes.size;
+                selectedNodes.clear();
+            }
+            
+            if (selectedLinks.size > 0) {
+                links = links.filter(l => !selectedLinks.has(l));
+                elementsDeleted += selectedLinks.size;
+                selectedLinks.clear();
+            }
+
+            if (elementsDeleted > 0) {
                 updateGraph();
-                showMessage("Stato eliminato.");
-            } else if (selectedLink) {
-                links = links.filter(l => l !== selectedLink);
-                selectedLink = null;
-                updateGraph();
-                showMessage("Collegamento eliminato.");
+                showMessage(`${elementsDeleted} element(s) deleted.`);
             }
         }
 
@@ -622,70 +761,80 @@
             if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
         });
 
-        // --- Selezione & UI Pannello ---
-        function selectNode(node) {
-            selectedNode = node;
-            selectedLink = null;
-            updateGraph();
-        }
-
-        function selectLink(link) {
-            selectedLink = link;
-            selectedNode = null;
-            updateGraph();
-        }
-
+        // --- Aggiornamento UI Pannello Laterale ---
         function updateSidebar() {
-            document.getElementById('panel-empty').classList.toggle('hidden', selectedNode || selectedLink);
-            document.getElementById('panel-node').classList.toggle('hidden', !selectedNode);
-            document.getElementById('panel-link').classList.toggle('hidden', !selectedLink);
+            let totalSelected = selectedNodes.size + selectedLinks.size;
+            
+            document.getElementById('panel-empty').classList.add('hidden');
+            document.getElementById('panel-multi').classList.add('hidden');
+            document.getElementById('panel-node').classList.add('hidden');
+            document.getElementById('panel-link').classList.add('hidden');
 
-            if (selectedNode) {
-                document.getElementById('prop-node-name').value = selectedNode.name;
-                document.getElementById('prop-node-start').checked = selectedNode.isStart;
-                document.getElementById('prop-node-final').checked = selectedNode.isFinal;
-            }
-            if (selectedLink) {
-                document.getElementById('prop-link-label').value = selectedLink.label;
+            if (totalSelected === 0) {
+                document.getElementById('panel-empty').classList.remove('hidden');
+            } else if (totalSelected > 1) {
+                document.getElementById('panel-multi').classList.remove('hidden');
+                document.getElementById('multi-count').innerText = `${totalSelected} elements selected`;
+            } else if (selectedNodes.size === 1) {
+                document.getElementById('panel-node').classList.remove('hidden');
+                let node = Array.from(selectedNodes)[0];
+                document.getElementById('prop-node-name').value = node.name;
+                document.getElementById('prop-node-start').checked = node.isStart;
+                document.getElementById('prop-node-final').checked = node.isFinal;
+            } else if (selectedLinks.size === 1) {
+                document.getElementById('panel-link').classList.remove('hidden');
+                let link = Array.from(selectedLinks)[0];
+                document.getElementById('prop-link-label').value = link.label;
             }
         }
 
+        // Ascoltatori Sidebar Singola Modifica
         document.getElementById('prop-node-name').addEventListener('input', (e) => {
-            if (selectedNode) { selectedNode.name = e.target.value; updateGraph(); }
+            if (selectedNodes.size === 1) { 
+                Array.from(selectedNodes)[0].name = e.target.value; updateGraph(); 
+            }
         });
         document.getElementById('prop-node-start').addEventListener('change', (e) => {
-            if (selectedNode && e.target.checked) {
-                nodes.forEach(n => n.isStart = false); 
-                selectedNode.isStart = true;
-                updateGraph();
-            } else if (selectedNode && !e.target.checked) {
-                e.target.checked = true; 
-                showMessage("Deve esistere uno stato iniziale.", "error");
+            if (selectedNodes.size === 1) {
+                let node = Array.from(selectedNodes)[0];
+                if (e.target.checked) {
+                    nodes.forEach(n => n.isStart = false); 
+                    node.isStart = true;
+                    updateGraph();
+                } else if (!e.target.checked) {
+                    e.target.checked = true; 
+                    showMessage("An initial state must exist.", "error");
+                }
             }
         });
         document.getElementById('prop-node-final').addEventListener('change', (e) => {
-            if (selectedNode) { selectedNode.isFinal = e.target.checked; updateGraph(); }
+            if (selectedNodes.size === 1) { 
+                Array.from(selectedNodes)[0].isFinal = e.target.checked; updateGraph(); 
+            }
         });
-        document.getElementById('btn-delete-node').addEventListener('click', deleteSelected);
 
         document.getElementById('prop-link-label').addEventListener('input', (e) => {
-            if (selectedLink) { 
+            if (selectedLinks.size === 1) { 
                 let val = e.target.value.replace(/\s+/g, '');
-                selectedLink.label = val; 
+                Array.from(selectedLinks)[0].label = val; 
                 updateGraph(); 
             }
         });
         document.getElementById('btn-add-epsilon-panel').addEventListener('click', () => {
-            if (selectedLink) {
+            if (selectedLinks.size === 1) {
+                let link = Array.from(selectedLinks)[0];
                 let input = document.getElementById('prop-link-label');
                 let val = input.value;
                 val = val ? val + "," + EPSILON : EPSILON;
-                selectedLink.label = val;
+                link.label = val;
                 input.value = val;
                 updateGraph();
             }
         });
+        
+        document.getElementById('btn-delete-node').addEventListener('click', deleteSelected);
         document.getElementById('btn-delete-link').addEventListener('click', deleteSelected);
+        document.getElementById('btn-delete-multi').addEventListener('click', deleteSelected);
 
         // --- Gestione Modalità ---
         function setMode(newMode) {
@@ -701,9 +850,9 @@
             activeBtn.classList.add('bg-blue-50', 'text-blue-700', 'border-blue-200');
 
             let hint = "";
-            if (mode === 'select') hint = "Modalità selezione: clicca per selezionare, trascina per muovere. Usa Canc/Backspace per eliminare.";
-            else if (mode === 'node') hint = "Clicca nell'area di lavoro per creare un nuovo stato.";
-            else if (mode === 'link') hint = "Trascina da uno stato all'altro per creare un collegamento.";
+            if (mode === 'select') hint = "Drag on the background to select multiple elements. Hold Shift to add to selection.";
+            else if (mode === 'node') hint = "Click on the workspace to create a new state.";
+            else if (mode === 'link') hint = "Drag from one state to another to create a transition.";
             document.getElementById('mode-hint').innerText = hint;
             
             svg.style("cursor", mode === 'node' ? 'crosshair' : 'default');
@@ -764,7 +913,7 @@
             p.className = `mb-1 ${colorClass}`;
             p.innerHTML = text;
             logDiv.appendChild(p);
-            logDiv.scrollTop = logDiv.scrollHeight; // Auto-scroll assicurato dall'altezza fissa del container
+            logDiv.scrollTop = logDiv.scrollHeight; 
         }
         
         function clearSimLog() {
@@ -785,7 +934,7 @@
             let alphabet = alphaStr.split(',');
             for (let char of inputStr) {
                 if (!alphabet.includes(char)) {
-                    showMessage(`Simbolo '${char}' non appartiene all'alfabeto.`, "error");
+                    showMessage(`Symbol '${char}' is not in the alphabet.`, "error");
                     return false;
                 }
             }
@@ -794,15 +943,15 @@
 
         // Simulazione Completa
         document.getElementById('btn-sim-quick').addEventListener('click', () => {
-            if(nodes.length === 0) return showMessage("L'automa è vuoto.", "error");
+            if(nodes.length === 0) return showMessage("The automaton is empty.", "error");
             let startNode = getStartNode();
-            if (!startNode) return showMessage("Manca lo stato iniziale.", "error");
+            if (!startNode) return showMessage("Missing start state.", "error");
 
             let inputStr = document.getElementById('sim-input').value;
             if (!validateInputAlphabet(inputStr)) return;
 
             clearSimLog();
-            appendSimLog(`Test rapido: <b>"${inputStr || 'ε'}"</b>`, "info");
+            appendSimLog(`Quick test: <b>"${inputStr || 'ε'}"</b>`, "info");
             
             activeStates = eClosure(new Set([startNode.id]));
             
@@ -816,9 +965,9 @@
             updateGraph();
             
             if (checkAcceptance()) {
-                appendSimLog("Risultato: Stringa ACCETTATA.", "success");
+                appendSimLog("Result: String ACCEPTED.", "success");
             } else {
-                appendSimLog("Risultato: Stringa RIFIUTATA.", "error");
+                appendSimLog("Result: String REJECTED.", "error");
             }
             
             setTimeout(() => {
@@ -831,9 +980,9 @@
 
         // Simulazione Step-by-Step
         document.getElementById('btn-sim-start-step').addEventListener('click', () => {
-            if(nodes.length === 0) return showMessage("L'automa è vuoto.", "error");
+            if(nodes.length === 0) return showMessage("The automaton is empty.", "error");
             let startNode = getStartNode();
-            if (!startNode) return showMessage("Manca lo stato iniziale.", "error");
+            if (!startNode) return showMessage("Missing start state.", "error");
 
             let inputStr = document.getElementById('sim-input').value;
             if (!validateInputAlphabet(inputStr)) return;
@@ -842,8 +991,7 @@
             simString = inputStr;
             simIndex = 0;
             
-            selectNode(null);
-            selectLink(null);
+            clearSelection();
             setMode('select'); 
 
             document.getElementById('btn-sim-start-step').classList.add('hidden');
@@ -854,12 +1002,12 @@
             document.getElementById('btn-sim-next').classList.remove('opacity-50');
 
             clearSimLog();
-            appendSimLog(`Avvio Step-by-Step. Input: <b>"${simString || 'ε'}"</b>`, "info");
+            appendSimLog(`Starting Step-by-Step. Input: <b>"${simString || 'ε'}"</b>`, "info");
             
             activeStates = eClosure(new Set([startNode.id]));
             
             let stateNames = Array.from(activeStates).map(id => nodes.find(n=>n.id===id).name).join(', ');
-            appendSimLog(`Inizializzazione (con e-closure): Stati { ${stateNames} }`);
+            appendSimLog(`Initialization (with e-closure): States { ${stateNames} }`);
             updateGraph();
             
             if (simString.length === 0) evaluteFinalStep();
@@ -869,20 +1017,20 @@
             if (!isSimulating) return;
 
             let char = simString[simIndex];
-            appendSimLog(`Leggo simbolo: <b>'${char}'</b>`);
+            appendSimLog(`Reading symbol: <b>'${char}'</b>`);
             
             let moved = move(activeStates, char);
             activeStates = eClosure(moved);
             
             if (activeStates.size === 0) {
-                appendSimLog(`Nessuna transizione valida. Automa in pozzo (bloccato).`, "error");
+                appendSimLog(`No valid transition. Automaton blocked (trap state).`, "error");
                 evaluteFinalStep();
                 updateGraph();
                 return;
             } 
             
             let stateNames = Array.from(activeStates).map(id => nodes.find(n=>n.id===id).name).join(', ');
-            appendSimLog(`Nuovi stati attivi: { ${stateNames} }`);
+            appendSimLog(`New active states: { ${stateNames} }`);
             
             simIndex++;
             updateGraph();
@@ -892,9 +1040,9 @@
 
         function evaluteFinalStep() {
             if (checkAcceptance()) {
-                appendSimLog("Fine stringa. <b>ACCETTATA</b>", "success");
+                appendSimLog("End of string. <b>ACCEPTED</b>", "success");
             } else {
-                appendSimLog("Fine stringa. <b>RIFIUTATA</b>", "error");
+                appendSimLog("End of string. <b>REJECTED</b>", "error");
             }
             document.getElementById('btn-sim-next').classList.add('opacity-50');
             document.getElementById('btn-sim-next').disabled = true;
@@ -910,7 +1058,7 @@
             document.getElementById('btn-sim-stop').classList.add('hidden');
             document.getElementById('btn-sim-next').classList.add('hidden');
             
-            appendSimLog("Simulazione interrotta.");
+            appendSimLog("Simulation stopped.");
         });
 
         function showMessage(msg, type="info") {
