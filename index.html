@@ -28,7 +28,7 @@
             transition: fill 0.2s, stroke 0.2s, stroke-width 0.2s;
         }
         .node.selected circle {
-            stroke: #0ea5e9; /* Sky 500 per selezione multipla e singola */
+            stroke: #0ea5e9;
             stroke-width: 3.5px;
         }
         .node.active circle.main-circle {
@@ -99,8 +99,8 @@
 
     <!-- Header -->
     <header class="bg-slate-900 text-white px-6 py-3 flex justify-between items-center z-30 shadow-md">
-        <h1 class="text-xl font-bold flex items-center gap-2">
-            <i class="ph ph-graph"></i>
+        <h1 class="text-xl font-bold flex items-center gap-3">
+            <img src="logo.png" alt="Logo" class="h-8 w-auto object-contain rounded">
             Finite State Automaton Simulator
         </h1>
         <div id="message-box" class="opacity-0 px-4 py-1.5 rounded bg-blue-500 text-white font-medium text-sm transition-opacity duration-300">
@@ -120,7 +120,7 @@
 
             <!-- Wrapper per nascondere il contenuto in chiusura -->
             <div class="w-full flex-1 overflow-hidden relative">
-                <!-- Contenuto a larghezza fissa (absolute per non deformarsi) -->
+                <!-- Contenuto a larghezza fissa -->
                 <div class="w-80 h-full overflow-y-auto flex flex-col absolute top-0 left-0">
                     <!-- Strumenti -->
                     <div class="p-5 border-b border-gray-100">
@@ -209,7 +209,7 @@
 
             <!-- Wrapper per nascondere il contenuto in chiusura -->
             <div class="w-full flex-1 overflow-hidden relative">
-                <!-- Contenuto a larghezza fissa (absolute right-0 per allinearsi correttamente) -->
+                <!-- Contenuto a larghezza fissa -->
                 <div class="w-80 h-full flex flex-col p-5 absolute top-0 right-0">
                     <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Simulation</h2>
                     
@@ -306,13 +306,13 @@
         let links = [];
         let nodeIdCounter = 0;
         
-        let mode = 'select'; // 'select', 'node', 'link'
+        let mode = 'select';
         
         // Selezione Multipla
         let selectedNodes = new Set();
         let selectedLinks = new Set();
         
-        // Drag Box (Rettangolo di Selezione)
+        // Drag Box
         let isSelecting = false;
         let selectionBox = { x1: 0, y1: 0, x2: 0, y2: 0 };
         
@@ -360,23 +360,21 @@
             .attr("xoverflow", "visible")
             .append("svg:path")
             .attr("d", "M 0,-5 L 10 ,0 L 0,5")
-            .attr("fill", "#0ea5e9") // Sky 500
+            .attr("fill", "#0ea5e9")
             .style("stroke", "none");
 
         const linkGroup = svg.append("g").attr("class", "links");
         const nodeGroup = svg.append("g").attr("class", "nodes");
         
-        // Elementi grafici temporanei
         let dragLine = svg.append("path").attr("class", "dragline hidden").attr("d", "M0,0L0,0");
         let selectionRect = svg.append("rect").attr("class", "selection-box hidden");
         let mousedownNode = null;
 
-        // --- Gestione Selezione Rettangolare ---
+        // --- Gestione Selezione Rettangolare (Corretta) ---
         function handleSvgMouseDown(event) {
             if (isSimulating || mode !== 'select' || event.target.tagName !== 'svg') return;
             
-            // Inizia la selezione a scatola
-            let p = d3.pointer(event);
+            let p = d3.pointer(event, svg.node());
             isSelecting = true;
             selectionBox.x1 = p[0];
             selectionBox.y1 = p[1];
@@ -395,7 +393,7 @@
 
         function handleSvgMouseMove(event) {
             if (isSelecting) {
-                let p = d3.pointer(event);
+                let p = d3.pointer(event, svg.node());
                 selectionBox.x2 = p[0];
                 selectionBox.y2 = p[1];
                 
@@ -420,7 +418,6 @@
                 let minY = Math.min(selectionBox.y1, selectionBox.y2);
                 let maxY = Math.max(selectionBox.y1, selectionBox.y2);
                 
-                // Evita click involontari se il trascinamento è stato nullo
                 if (maxX - minX > 5 || maxY - minY > 5) {
                     nodes.forEach(n => {
                         if (n.x >= minX && n.x <= maxX && n.y >= minY && n.y <= maxY) {
@@ -428,7 +425,6 @@
                         }
                     });
                     
-                    // Seleziona anche i collegamenti se entrambi gli estremi sono nel rettangolo
                     links.forEach(l => {
                         if (selectedNodes.has(l.source) && selectedNodes.has(l.target)) {
                             selectedLinks.add(l);
@@ -603,7 +599,6 @@
         function dragged(event, d) {
             if (isSimulating) return;
             if (mode === 'select') {
-                // Muovi tutti i nodi selezionati
                 selectedNodes.forEach(node => {
                     node.x += event.dx;
                     node.y += event.dy;
@@ -635,7 +630,6 @@
 
         function handleSvgClick(event) {
             if (isSimulating) return;
-            // Se eravamo in selezione a box e abbiamo finito, ignora il click
             if (isSelecting) return;
             
             if (mode === 'node' && event.target.tagName === 'svg') {
@@ -647,7 +641,7 @@
             }
         }
 
-        // --- Gestione Dati & Operazioni ---
+        // --- Gestione Dati & Operazioni (Corretta) ---
         function addNode(x, y) {
             let isFirst = nodes.length === 0;
             let node = {
@@ -663,6 +657,7 @@
             clearSelection();
             selectedNodes.add(node);
             setMode('select');
+            updateGraph(); // Aggiornamento UI inserito correttamente
         }
 
         let pendingLink = null;
@@ -730,12 +725,9 @@
             let elementsDeleted = 0;
             
             if (selectedNodes.size > 0) {
-                // Rimuovi link associati ai nodi da eliminare
                 links = links.filter(l => !selectedNodes.has(l.source) && !selectedNodes.has(l.target));
-                // Rimuovi nodi
                 nodes = nodes.filter(n => !selectedNodes.has(n));
                 
-                // Fix stato iniziale
                 if (!nodes.some(n => n.isStart) && nodes.length > 0) {
                     nodes[0].isStart = true;
                 }
