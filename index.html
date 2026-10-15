@@ -17,27 +17,24 @@
         svg {
             cursor: default;
             user-select: none;
-            background-color: #f8fafc; /* light gray bg */
+            background-color: #f8fafc;
         }
         
         /* Nodes */
         .node circle {
             fill: #ffffff;
-            stroke: #1e293b; /* Slate 800 - dark gray/black */
+            stroke: #1e293b;
             stroke-width: 2px;
             transition: fill 0.2s, stroke 0.2s, stroke-width 0.2s;
         }
-        /* Selection */
         .node.selected circle {
-            stroke: #ea580c; /* Orange for clear selection */
+            stroke: #ea580c;
             stroke-width: 3.5px;
         }
-        /* Active during simulation */
         .node.active circle.main-circle {
-            fill: #bbf7d0; /* Light green */
-            stroke: #166534; /* Dark green */
+            fill: #bbf7d0;
+            stroke: #166534;
         }
-        /* Final State - Double Circle */
         .node.final circle.inner {
             stroke: #1e293b;
             stroke-width: 2px;
@@ -62,7 +59,7 @@
         /* Links */
         .link {
             fill: none;
-            stroke: #475569; /* Slate 600 */
+            stroke: #475569;
             stroke-width: 2px;
             cursor: pointer;
             transition: stroke 0.2s, stroke-width 0.2s;
@@ -82,25 +79,18 @@
             opacity: 0.9;
         }
 
-        /* Temp link during drag */
         .dragline {
             fill: none;
             stroke: #94a3b8;
             stroke-width: 2px;
             stroke-dasharray: 5,5;
         }
-
-        /* Tooltip & Modals */
-        .fade-enter { opacity: 0; }
-        .fade-enter-active { opacity: 1; transition: opacity 200ms ease-in; }
-        .fade-exit { opacity: 1; }
-        .fade-exit-active { opacity: 0; transition: opacity 200ms ease-out; }
     </style>
 </head>
 <body class="bg-gray-100 h-screen flex flex-col overflow-hidden text-slate-800">
 
     <!-- Header -->
-    <header class="bg-slate-900 text-white px-6 py-3 flex justify-between items-center z-10 shadow-md">
+    <header class="bg-slate-900 text-white px-6 py-3 flex justify-between items-center z-30 shadow-md">
         <h1 class="text-xl font-bold flex items-center gap-2">
             <i class="ph ph-graph"></i>
             Simulatore Automi a Stati Finiti
@@ -111,88 +101,108 @@
     </header>
 
     <!-- Main Workspace -->
-    <div class="flex flex-1 overflow-hidden">
+    <div class="flex flex-1 overflow-hidden relative">
         
-        <!-- Sidebar Controlli -->
-        <aside class="w-80 bg-white border-r border-gray-200 flex flex-col shadow-lg z-10 overflow-y-auto">
-            
-            <!-- Strumenti -->
-            <div class="p-5 border-b border-gray-100">
-                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Strumenti di Disegno</h2>
-                <div class="flex gap-2 mb-2">
-                    <button id="btn-mode-select" class="flex-1 py-2 px-3 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-semibold text-sm flex items-center justify-center gap-1 transition-colors">
-                        <i class="ph ph-cursor-click"></i> Seleziona
-                    </button>
-                </div>
-                <div class="flex gap-2">
-                    <button id="btn-mode-node" class="flex-1 py-2 px-3 rounded-md bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 font-semibold text-sm flex items-center justify-center gap-1 transition-colors">
-                        <i class="ph ph-circle-plus"></i> Stato
-                    </button>
-                    <button id="btn-mode-link" class="flex-1 py-2 px-3 rounded-md bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 font-semibold text-sm flex items-center justify-center gap-1 transition-colors">
-                        <i class="ph ph-arrow-right"></i> Collega
-                    </button>
-                </div>
-                <p class="text-[11px] text-slate-500 mt-3 leading-tight" id="mode-hint">
-                    Modalità selezione: clicca per selezionare, trascina per muovere. Usa Canc/Backspace per eliminare.
-                </p>
-            </div>
+        <!-- Sidebar SX: Controlli e Strumenti -->
+        <aside id="sidebar-left" class="w-80 bg-white border-r border-gray-200 shadow-lg z-20 transition-[width] duration-300 relative flex flex-col">
+            <!-- Pulsante Toggle SX -->
+            <button id="btn-toggle-left" class="absolute -right-8 top-1/2 transform -translate-y-1/2 bg-white border border-gray-200 border-l-0 rounded-r-md p-1.5 shadow-sm hover:bg-gray-50 z-30 flex items-center justify-center">
+                <i id="icon-left" class="ph ph-caret-left text-lg"></i>
+            </button>
 
-            <!-- Proprietà -->
-            <div class="p-5 border-b border-gray-100 min-h-[180px]">
-                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Proprietà Selezione</h2>
-                <div id="panel-empty" class="text-sm text-slate-400 italic text-center py-4">Nessun elemento selezionato.</div>
-                
-                <!-- Proprietà Stato -->
-                <div id="panel-node" class="hidden flex flex-col gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Nome Stato</label>
-                        <input type="text" id="prop-node-name" class="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+            <!-- Contenuto Sidebar SX -->
+            <div class="w-80 flex-1 overflow-y-auto flex flex-col">
+                <!-- Strumenti -->
+                <div class="p-5 border-b border-gray-100">
+                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Strumenti di Disegno</h2>
+                    <div class="flex gap-2 mb-2">
+                        <button id="btn-mode-select" class="flex-1 py-2 px-3 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-semibold text-sm flex items-center justify-center gap-1 transition-colors">
+                            <i class="ph ph-cursor-click"></i> Seleziona
+                        </button>
                     </div>
-                    <div class="flex flex-col gap-2">
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" id="prop-node-start" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                            <span class="text-sm text-slate-700 font-medium">Stato Iniziale</span>
-                        </label>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" id="prop-node-final" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                            <span class="text-sm text-slate-700 font-medium">Stato Finale</span>
-                        </label>
+                    <div class="flex gap-2">
+                        <button id="btn-mode-node" class="flex-1 py-2 px-3 rounded-md bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 font-semibold text-sm flex items-center justify-center gap-1 transition-colors">
+                            <i class="ph ph-circle-plus"></i> Stato
+                        </button>
+                        <button id="btn-mode-link" class="flex-1 py-2 px-3 rounded-md bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 font-semibold text-sm flex items-center justify-center gap-1 transition-colors">
+                            <i class="ph ph-arrow-right"></i> Collega
+                        </button>
                     </div>
-                    <button id="btn-delete-node" class="text-sm text-red-600 hover:text-red-800 text-left font-semibold flex items-center gap-1 mt-1">
-                        <i class="ph ph-trash"></i> Elimina Stato (Canc)
-                    </button>
+                    <p class="text-[11px] text-slate-500 mt-3 leading-tight" id="mode-hint">
+                        Modalità selezione: clicca per selezionare, trascina per muovere. Usa Canc/Backspace per eliminare.
+                    </p>
                 </div>
 
-                <!-- Proprietà Collegamento -->
-                <div id="panel-link" class="hidden flex flex-col gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Simboli Transizione (es. a, b)</label>
-                        <div class="flex gap-2">
-                            <input type="text" id="prop-link-label" class="flex-1 border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                            <button id="btn-add-epsilon-panel" class="px-3 py-1.5 bg-slate-100 border border-slate-300 rounded text-sm hover:bg-slate-200 font-medium" title="Aggiungi Epsilon">ε</button>
+                <!-- Proprietà -->
+                <div class="p-5 border-b border-gray-100 flex-1">
+                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Proprietà Selezione</h2>
+                    <div id="panel-empty" class="text-sm text-slate-400 italic text-center py-4">Nessun elemento selezionato.</div>
+                    
+                    <!-- Proprietà Stato -->
+                    <div id="panel-node" class="hidden flex flex-col gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Nome Stato</label>
+                            <input type="text" id="prop-node-name" class="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                         </div>
+                        <div class="flex flex-col gap-2">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="prop-node-start" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                <span class="text-sm text-slate-700 font-medium">Stato Iniziale</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="prop-node-final" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                <span class="text-sm text-slate-700 font-medium">Stato Finale</span>
+                            </label>
+                        </div>
+                        <button id="btn-delete-node" class="text-sm text-red-600 hover:text-red-800 text-left font-semibold flex items-center gap-1 mt-1">
+                            <i class="ph ph-trash"></i> Elimina Stato (Canc)
+                        </button>
                     </div>
-                    <button id="btn-delete-link" class="text-sm text-red-600 hover:text-red-800 text-left font-semibold flex items-center gap-1 mt-1">
-                        <i class="ph ph-trash"></i> Elimina Collegamento (Canc)
-                    </button>
+
+                    <!-- Proprietà Collegamento -->
+                    <div id="panel-link" class="hidden flex flex-col gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Simboli Transizione (es. a, b)</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="prop-link-label" class="flex-1 border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                <button id="btn-add-epsilon-panel" class="px-3 py-1.5 bg-slate-100 border border-slate-300 rounded text-sm hover:bg-slate-200 font-medium" title="Aggiungi Epsilon">ε</button>
+                            </div>
+                        </div>
+                        <button id="btn-delete-link" class="text-sm text-red-600 hover:text-red-800 text-left font-semibold flex items-center gap-1 mt-1">
+                            <i class="ph ph-trash"></i> Elimina Collegamento (Canc)
+                        </button>
+                    </div>
                 </div>
             </div>
+        </aside>
 
-            <!-- Simulazione -->
-            <div class="p-5 flex-1 flex flex-col bg-slate-50">
+        <!-- Area di Disegno Centrale -->
+        <main class="flex-1 relative z-10" id="canvas-container">
+            <!-- SVG init via D3 -->
+        </main>
+
+        <!-- Sidebar DX: Simulazione -->
+        <aside id="sidebar-right" class="w-80 bg-slate-50 border-l border-gray-200 shadow-lg z-20 transition-[width] duration-300 relative flex flex-col">
+            <!-- Pulsante Toggle DX -->
+            <button id="btn-toggle-right" class="absolute -left-8 top-1/2 transform -translate-y-1/2 bg-white border border-gray-200 border-r-0 rounded-l-md p-1.5 shadow-sm hover:bg-gray-50 z-30 flex items-center justify-center">
+                <i id="icon-right" class="ph ph-caret-right text-lg"></i>
+            </button>
+
+            <!-- Contenuto Sidebar DX -->
+            <div class="w-80 flex-1 flex flex-col p-5 overflow-hidden">
                 <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Simulazione</h2>
                 
-                <div class="mb-3">
+                <div class="mb-3 shrink-0">
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Alfabeto (opzionale, es. a,b)</label>
                     <input type="text" id="sim-alphabet" class="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500" placeholder="Lascia vuoto per libere">
                 </div>
 
-                <div class="mb-4">
+                <div class="mb-4 shrink-0">
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Stringa in Input</label>
-                    <input type="text" id="sim-input" class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500 font-mono" placeholder="Inserisci stringa da testare...">
+                    <input type="text" id="sim-input" class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500 font-mono" placeholder="Inserisci stringa...">
                 </div>
 
-                <div class="flex flex-col gap-2 mb-4">
+                <div class="flex flex-col gap-2 mb-4 shrink-0">
                     <button id="btn-sim-quick" class="w-full py-2 bg-blue-600 text-white rounded font-semibold text-sm hover:bg-blue-700 transition flex justify-center items-center gap-2">
                         <i class="ph ph-lightning"></i> Simulazione Completa
                     </button>
@@ -209,20 +219,15 @@
                     </button>
                 </div>
 
-                <!-- Log Simulazione -->
+                <!-- Log Simulazione (Autoscroll) -->
                 <div id="sim-status" class="bg-white border border-slate-200 rounded p-3 text-sm flex-1 overflow-y-auto font-mono shadow-inner">
                     <span class="text-slate-400 italic">In attesa di input...</span>
                 </div>
             </div>
         </aside>
-
-        <!-- Area di Disegno -->
-        <main class="flex-1 relative" id="canvas-container">
-            <!-- SVG init via D3 -->
-        </main>
     </div>
 
-    <!-- Modale Transizione (Sostituisce il prompt nativo) -->
+    <!-- Modale Transizione -->
     <div id="modal-transition" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50">
         <div class="bg-white rounded-lg shadow-xl w-80 overflow-hidden transform transition-all">
             <div class="px-5 py-4 border-b border-slate-100">
@@ -246,6 +251,31 @@
 
     <!-- Logica Applicazione -->
     <script>
+        // --- Gestione Pannelli Laterali (Toggle) ---
+        const sidebarLeft = document.getElementById('sidebar-left');
+        const iconLeft = document.getElementById('icon-left');
+        document.getElementById('btn-toggle-left').addEventListener('click', () => {
+            if(sidebarLeft.classList.contains('w-80')) {
+                sidebarLeft.classList.replace('w-80', 'w-0');
+                iconLeft.classList.replace('ph-caret-left', 'ph-caret-right');
+            } else {
+                sidebarLeft.classList.replace('w-0', 'w-80');
+                iconLeft.classList.replace('ph-caret-right', 'ph-caret-left');
+            }
+        });
+
+        const sidebarRight = document.getElementById('sidebar-right');
+        const iconRight = document.getElementById('icon-right');
+        document.getElementById('btn-toggle-right').addEventListener('click', () => {
+            if(sidebarRight.classList.contains('w-80')) {
+                sidebarRight.classList.replace('w-80', 'w-0');
+                iconRight.classList.replace('ph-caret-right', 'ph-caret-left');
+            } else {
+                sidebarRight.classList.replace('w-0', 'w-80');
+                iconRight.classList.replace('ph-caret-left', 'ph-caret-right');
+            }
+        });
+
         // --- Costanti e Stato Globale ---
         const EPSILON = 'ε';
         const NODE_RADIUS = 26;
@@ -271,7 +301,6 @@
             .attr("height", "100%")
             .on("click", handleSvgClick);
 
-        // Definizioni Frecce (Normale, Selezionata)
         const defs = svg.append("defs");
         
         defs.append("marker")
@@ -285,7 +314,7 @@
             .attr("xoverflow", "visible")
             .append("svg:path")
             .attr("d", "M 0,-5 L 10 ,0 L 0,5")
-            .attr("fill", "#475569") // Slate 600
+            .attr("fill", "#475569")
             .style("stroke", "none");
 
         defs.append("marker")
@@ -299,13 +328,12 @@
             .attr("xoverflow", "visible")
             .append("svg:path")
             .attr("d", "M 0,-5 L 10 ,0 L 0,5")
-            .attr("fill", "#ea580c") // Orange 600
+            .attr("fill", "#ea580c")
             .style("stroke", "none");
 
         const linkGroup = svg.append("g").attr("class", "links");
         const nodeGroup = svg.append("g").attr("class", "nodes");
         
-        // Linea per drag&drop transizioni
         let dragLine = svg.append("path")
             .attr("class", "dragline hidden")
             .attr("d", "M0,0L0,0");
@@ -314,7 +342,6 @@
 
         // --- Aggiornamento Grafica (D3) ---
         function updateGraph() {
-            // -- Links --
             let linkElements = linkGroup.selectAll("g.link-group")
                 .data(links, d => d.source.id + "-" + d.target.id);
 
@@ -333,7 +360,6 @@
                     }
                 });
 
-            // Sfondo etichetta
             linkEnter.append("text")
                 .attr("class", "link-label-bg")
                 .attr("text-anchor", "middle")
@@ -342,7 +368,6 @@
                 .attr("stroke-width", 5)
                 .attr("stroke-linejoin", "round");
                 
-            // Testo etichetta
             linkEnter.append("text")
                 .attr("class", "link-label")
                 .attr("text-anchor", "middle")
@@ -365,7 +390,6 @@
                 .attr("x", d => getLabelPosition(d).x)
                 .attr("y", d => getLabelPosition(d).y);
 
-            // -- Nodes --
             let nodeElements = nodeGroup.selectAll("g.node")
                 .data(nodes, d => d.id);
 
@@ -385,22 +409,19 @@
                     event.stopPropagation();
                 });
 
-            // Freccia d'ingresso per stato iniziale
             nodeEnter.append("path")
                 .attr("class", "start-arrow")
                 .attr("d", `M ${-NODE_RADIUS - 35} 0 L ${-NODE_RADIUS - 2} 0 M ${-NODE_RADIUS - 12} -6 L ${-NODE_RADIUS - 2} 0 L ${-NODE_RADIUS - 12} 6`)
-                .attr("stroke", "#1e293b") // Dark grey
+                .attr("stroke", "#1e293b")
                 .attr("stroke-width", 2.5)
                 .attr("fill", "none")
                 .attr("stroke-linejoin", "round")
                 .attr("stroke-linecap", "round");
 
-            // Cerchio Principale
             nodeEnter.append("circle")
                 .attr("class", "main-circle")
                 .attr("r", NODE_RADIUS);
             
-            // Cerchio Interno (Stato Finale)
             nodeEnter.append("circle")
                 .attr("class", "inner hidden")
                 .attr("r", NODE_RADIUS - 6);
@@ -412,18 +433,12 @@
 
             nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
             
-            // Applica classi di stato
             nodeElements.classed("selected", d => d === selectedNode);
             nodeElements.classed("active", d => activeStates.has(d.id));
             nodeElements.classed("final", d => d.isFinal);
             
-            // Mostra/Nascondi freccia iniziale
             nodeElements.select(".start-arrow").style("display", d => d.isStart ? "block" : "none");
-            
-            // Mostra/Nascondi cerchio interno (finale)
             nodeElements.select(".inner").classed("hidden", d => !d.isFinal);
-            
-            // Aggiorna Nome
             nodeElements.select("text").text(d => d.name);
 
             updateSidebar();
@@ -432,22 +447,17 @@
         // --- Calcolo Posizioni e Curve ---
         function calculateLinkPath(d) {
             if (d.source === d.target) {
-                // Self-loop verso l'alto
                 let x = d.source.x;
                 let y = d.source.y;
                 return `M ${x - 8},${y - NODE_RADIUS + 2} C ${x - 30},${y - NODE_RADIUS - 40} ${x + 30},${y - NODE_RADIUS - 40} ${x + 8},${y - NODE_RADIUS + 2}`;
             }
-            
             let bidirectional = links.find(l => l.source === d.target && l.target === d.source);
-            
             if (bidirectional) {
-                // Curva
                 let dx = d.target.x - d.source.x;
                 let dy = d.target.y - d.source.y;
-                let dr = Math.sqrt(dx * dx + dy * dy) * 1.5; // Moltiplicatore per abbassare l'arco
+                let dr = Math.sqrt(dx * dx + dy * dy) * 1.5;
                 return `M ${d.source.x},${d.source.y} A ${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
             } else {
-                // Linea dritta
                 return `M ${d.source.x},${d.source.y} L ${d.target.x},${d.target.y}`;
             }
         }
@@ -497,12 +507,10 @@
             if (isSimulating) return;
             if (mode === 'link' && mousedownNode) {
                 dragLine.classed("hidden", true);
-                
                 let p = d3.pointer(event, container);
                 let targetNode = nodes.find(n => {
                     let dx = n.x - p[0];
                     let dy = n.y - p[1];
-                    // Area di drop estesa
                     return (dx * dx + dy * dy) < (NODE_RADIUS * NODE_RADIUS * 3); 
                 });
                 
@@ -515,7 +523,6 @@
 
         function handleSvgClick(event) {
             if (isSimulating) return;
-            
             if (mode === 'node') {
                 let p = d3.pointer(event);
                 addNode(p[0], p[1]);
@@ -539,23 +546,19 @@
             nodeIdCounter++;
             nodes.push(node);
             selectNode(node);
-            // Torna a select mode se eravamo in node creation per comodità UX
             setMode('select');
         }
 
-        // Modale per nuova transizione (sostituisce il prompt nativo)
         let pendingLink = null;
         const modal = document.getElementById('modal-transition');
         const modalInput = document.getElementById('modal-input');
 
         function promptForTransition(source, target) {
-            // Controlla se esiste già
             let existing = links.find(l => l.source === source && l.target === target);
             if (existing) {
                 selectLink(existing);
                 return;
             }
-            
             pendingLink = { source, target };
             modalInput.value = '';
             modal.classList.remove('hidden');
@@ -588,29 +591,20 @@
                 showMessage("Inserisci almeno un simbolo (oppure Epsilon).", "error");
                 return;
             }
-            
             let link = { source: pendingLink.source, target: pendingLink.target, label: val };
             links.push(link);
             modal.classList.add('hidden');
             pendingLink = null;
-            
             selectLink(link);
-            setMode('select'); // Torna a modalità selezione
+            setMode('select'); 
         }
 
         function deleteSelected() {
             if (isSimulating) return;
-            
             if (selectedNode) {
-                // Elimina link collegati
                 links = links.filter(l => l.source !== selectedNode && l.target !== selectedNode);
                 nodes = nodes.filter(n => n !== selectedNode);
-                
-                // Gestione stato iniziale orfano
-                if (selectedNode.isStart && nodes.length > 0) {
-                    nodes[0].isStart = true;
-                }
-                
+                if (selectedNode.isStart && nodes.length > 0) nodes[0].isStart = true;
                 selectedNode = null;
                 updateGraph();
                 showMessage("Stato eliminato.");
@@ -622,16 +616,10 @@
             }
         }
 
-        // Event Listener Tastiera (Canc / Backspace)
         document.addEventListener('keydown', (e) => {
-            // Ignora se siamo in un input text
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-            // Ignora se modale aperto
             if (!modal.classList.contains('hidden')) return;
-
-            if (e.key === 'Delete' || e.key === 'Backspace') {
-                deleteSelected();
-            }
+            if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
         });
 
         // --- Selezione & UI Pannello ---
@@ -662,17 +650,16 @@
             }
         }
 
-        // Ascoltatori Input Sidebar
         document.getElementById('prop-node-name').addEventListener('input', (e) => {
             if (selectedNode) { selectedNode.name = e.target.value; updateGraph(); }
         });
         document.getElementById('prop-node-start').addEventListener('change', (e) => {
             if (selectedNode && e.target.checked) {
-                nodes.forEach(n => n.isStart = false); // Forza un solo stato iniziale
+                nodes.forEach(n => n.isStart = false); 
                 selectedNode.isStart = true;
                 updateGraph();
             } else if (selectedNode && !e.target.checked) {
-                e.target.checked = true; // Impedisci di toglierlo se è l'unico
+                e.target.checked = true; 
                 showMessage("Deve esistere uno stato iniziale.", "error");
             }
         });
@@ -705,7 +692,6 @@
             if (isSimulating) return;
             mode = newMode;
             
-            // Reset stili bottoni
             document.querySelectorAll('button[id^="btn-mode-"]').forEach(btn => {
                 btn.classList.remove('bg-blue-50', 'text-blue-700', 'border-blue-200');
                 btn.classList.add('bg-white', 'text-slate-600', 'border-slate-300');
@@ -727,14 +713,11 @@
         document.getElementById('btn-mode-node').addEventListener('click', () => setMode('node'));
         document.getElementById('btn-mode-link').addEventListener('click', () => setMode('link'));
 
-
         // --- Logica Simulazione ---
-
         function getStartNode() {
             return nodes.find(n => n.isStart);
         }
 
-        // Calcola l'Epsilon-Closure di un set di stati
         function eClosure(stateIds) {
             let closure = new Set(stateIds);
             let stack = Array.from(stateIds);
@@ -756,7 +739,6 @@
             return closure;
         }
 
-        // Muove i token in base al simbolo in input
         function move(stateIds, symbol) {
             let nextStates = new Set();
             for(let id of stateIds) {
@@ -782,7 +764,7 @@
             p.className = `mb-1 ${colorClass}`;
             p.innerHTML = text;
             logDiv.appendChild(p);
-            logDiv.scrollTop = logDiv.scrollHeight;
+            logDiv.scrollTop = logDiv.scrollHeight; // Auto-scroll assicurato dall'altezza fissa del container
         }
         
         function clearSimLog() {
@@ -799,7 +781,7 @@
 
         function validateInputAlphabet(inputStr) {
             let alphaStr = document.getElementById('sim-alphabet').value.replace(/\s+/g, '');
-            if (!alphaStr) return true; // Nessun controllo se alfabeto non specificato
+            if (!alphaStr) return true; 
             let alphabet = alphaStr.split(',');
             for (let char of inputStr) {
                 if (!alphabet.includes(char)) {
@@ -810,9 +792,7 @@
             return true;
         }
 
-        // --- Azioni Simulazione ---
-        
-        // Simulazione Completa/Rapida
+        // Simulazione Completa
         document.getElementById('btn-sim-quick').addEventListener('click', () => {
             if(nodes.length === 0) return showMessage("L'automa è vuoto.", "error");
             let startNode = getStartNode();
@@ -824,10 +804,8 @@
             clearSimLog();
             appendSimLog(`Test rapido: <b>"${inputStr || 'ε'}"</b>`, "info");
             
-            // Inizio
             activeStates = eClosure(new Set([startNode.id]));
             
-            // Passi
             for(let i = 0; i < inputStr.length; i++) {
                 let char = inputStr[i];
                 let next = move(activeStates, char);
@@ -843,7 +821,6 @@
                 appendSimLog("Risultato: Stringa RIFIUTATA.", "error");
             }
             
-            // Pulisci visualizzazione dopo 2.5s
             setTimeout(() => {
                 if(!isSimulating) {
                     activeStates.clear();
@@ -869,7 +846,6 @@
             selectLink(null);
             setMode('select'); 
 
-            // UI
             document.getElementById('btn-sim-start-step').classList.add('hidden');
             document.getElementById('btn-sim-quick').classList.add('hidden');
             document.getElementById('btn-sim-stop').classList.remove('hidden');
@@ -886,10 +862,7 @@
             appendSimLog(`Inizializzazione (con e-closure): Stati { ${stateNames} }`);
             updateGraph();
             
-            // Se stringa vuota, valuta subito
-            if (simString.length === 0) {
-                evaluteFinalStep();
-            }
+            if (simString.length === 0) evaluteFinalStep();
         });
 
         document.getElementById('btn-sim-next').addEventListener('click', () => {
@@ -914,9 +887,7 @@
             simIndex++;
             updateGraph();
 
-            if (simIndex >= simString.length) {
-                evaluteFinalStep();
-            }
+            if (simIndex >= simString.length) evaluteFinalStep();
         });
 
         function evaluteFinalStep() {
@@ -934,7 +905,6 @@
             activeStates.clear();
             updateGraph();
             
-            // UI
             document.getElementById('btn-sim-start-step').classList.remove('hidden');
             document.getElementById('btn-sim-quick').classList.remove('hidden');
             document.getElementById('btn-sim-stop').classList.add('hidden');
@@ -943,7 +913,6 @@
             appendSimLog("Simulazione interrotta.");
         });
 
-        // --- Utility ---
         function showMessage(msg, type="info") {
             const box = document.getElementById('message-box');
             box.innerText = msg;
@@ -960,9 +929,7 @@
             }, 3000);
         }
 
-        // Init
         updateGraph();
-
     </script>
 </body>
 </html>
