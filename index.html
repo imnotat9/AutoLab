@@ -2,1128 +2,1214 @@
 <html lang="en" class="light">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Automaton Simulator (DFA, NFA, e-NFA)</title>
-    <!-- Favicon -->
-    <link rel="icon" href="https://placehold.co/32x32/1e293b/ffffff?text=A" type="image/png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AutoLab</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     
-    <!-- Tailwind CSS & Config for Dark Mode -->
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- D3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
             theme: {
                 extend: {
-                    colors: {}
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        apple: { bg: '#f5f5f7', darkBg: '#000000', blue: '#007AFF', green: '#34C759', red: '#FF3B30' }
+                    },
+                    boxShadow: { 'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.1)', 'float': '0 10px 40px rgba(0,0,0,0.15)' }
                 }
             }
         }
     </script>
-    
-    <!-- D3.js -->
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <!-- Phosphor Icons -->
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        
-        /* D3 Canvas Styles */
-        svg {
-            cursor: default;
-            user-select: none;
-            background-color: transparent;
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-        
-        /* Nodes */
-        .node circle {
-            fill: #ffffff;
-            stroke: #1e293b;
-            stroke-width: 2px;
-            transition: fill 0.2s, stroke 0.2s, stroke-width 0.2s;
-        }
-        .dark .node circle {
-            fill: #1e293b;
-            stroke: #cbd5e1;
-        }
-        
-        .node.selected circle { stroke: #0ea5e9; stroke-width: 3.5px; }
-        .node.active circle.main-circle { fill: #bbf7d0; stroke: #166534; }
-        .dark .node.active circle.main-circle { fill: #14532d; stroke: #4ade80; }
-        
-        .node.final circle.inner {
-            stroke: #1e293b;
-            stroke-width: 2px;
-            fill: none;
-            display: block;
-        }
-        .dark .node.final circle.inner { stroke: #cbd5e1; }
-        .node.final.selected circle.inner { stroke: #0ea5e9; }
-        .node.final.active circle.inner { stroke: #166534; }
-        .dark .node.final.active circle.inner { stroke: #4ade80; }
-        
-        .node text {
-            font-size: 14px;
-            font-weight: 600;
-            fill: #0f172a;
-            pointer-events: none;
-            text-anchor: middle;
-            dominant-baseline: central;
-        }
-        .dark .node text { fill: #f8fafc; }
-        .dark .start-arrow { stroke: #cbd5e1 !important; }
-        
-        /* Links */
-        .link {
-            fill: none;
-            stroke: #475569;
-            stroke-width: 2.5px;
-            cursor: pointer;
-            transition: stroke 0.2s, stroke-width 0.2s;
-        }
-        .dark .link { stroke: #94a3b8; }
-        .link.selected { stroke: #0ea5e9; stroke-width: 4px; }
-        
-        .link-label { font-size: 14px; fill: #1e293b; font-weight: 700; pointer-events: none; }
-        .dark .link-label { fill: #f8fafc; }
-        
-        .link-label-bg { fill: transparent; stroke: #f8fafc; stroke-width: 6px; stroke-linejoin: round; }
-        .dark .link-label-bg { stroke: #0f172a; }
 
-        .dragline { fill: none; stroke: #94a3b8; stroke-width: 2px; stroke-dasharray: 5,5; }
-        .selection-box { fill: rgba(14, 165, 233, 0.15); stroke: rgba(14, 165, 233, 0.6); stroke-width: 1px; pointer-events: none; }
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #f5f5f7; font-family: 'Inter', sans-serif; }
+        .dark body { background-color: #0d0d0d; }
+        
+        /* Glassmorphism utilities */
+        .glass {
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+        .dark .glass {
+            background: rgba(30, 30, 30, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* SVG Canvas */
+        #canvas { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        
+        /* D3 Elements */
+        .node circle.bg { fill: #ffffff; stroke: #d1d5db; stroke-width: 2px; transition: all 0.2s ease; cursor: pointer; }
+        .dark .node circle.bg { fill: #1c1c1e; stroke: #3a3a3c; }
+        
+        .node:hover circle.bg { stroke: #007AFF; }
+        .node.selected circle.bg { stroke: #007AFF; stroke-width: 3.5px; box-shadow: 0 0 10px rgba(0,122,255,0.5); }
+        .node.active circle.bg { fill: #e5f0ff; stroke: #007AFF; }
+        .dark .node.active circle.bg { fill: #0a2540; stroke: #007AFF; }
+        
+        .node.final circle.inner { fill: none; stroke: #d1d5db; stroke-width: 2px; pointer-events: none; }
+        .dark .node.final circle.inner { stroke: #3a3a3c; }
+        .node.final.selected circle.inner, .node.final:hover circle.inner { stroke: #007AFF; }
+        
+        .node text { font-size: 14px; font-weight: 600; fill: #1d1d1f; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+        .dark .node text { fill: #f5f5f7; }
+        
+        .start-arrow { fill: none; stroke: #1d1d1f; stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+        .dark .start-arrow { stroke: #f5f5f7; }
+
+        .link-path { fill: none; stroke: #9ca3af; stroke-width: 2.5px; cursor: pointer; transition: stroke 0.2s ease; }
+        .dark .link-path { stroke: #4b5563; }
+        .link-group:hover .link-path, .link-group.selected .link-path { stroke: #007AFF; stroke-width: 3.5px; }
+        
+        .control-point { fill: #ffffff; stroke: #007AFF; stroke-width: 2px; cursor: grab; opacity: 0.6; transition: opacity 0.2s, r 0.2s; }
+        .dark .control-point { fill: #1c1c1e; }
+        .control-point:active { cursor: grabbing; }
+        .link-group:hover .control-point, .link-group.selected .control-point { opacity: 1; r: 6px; }
+
+        .link-label-bg { fill: rgba(255,255,255,0.85); rx: 6px; ry: 6px; pointer-events: none; }
+        .dark .link-label-bg { fill: rgba(0,0,0,0.85); }
+        .link-label { font-size: 13px; font-weight: 700; fill: #1d1d1f; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+        .dark .link-label { fill: #f5f5f7; }
+        
+        .dragline { fill: none; stroke: #007AFF; stroke-width: 3px; stroke-dasharray: 6,6; pointer-events: none; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.5); border-radius: 10px; }
+        
+        /* Modals & Animations */
+        .fade-in { animation: fadeIn 0.2s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        
+        .timeline-line::before { content: ''; position: absolute; left: 11px; top: 10px; bottom: -10px; width: 2px; background: #e5e7eb; z-index: 0; }
+        .dark .timeline-line::before { background: #374151; }
+        .timeline-item:last-child .timeline-line::before { display: none; }
     </style>
 </head>
-<body class="bg-slate-100 dark:bg-slate-950 h-screen flex flex-col overflow-hidden text-slate-800 dark:text-slate-100 transition-colors duration-300">
+<body class="text-slate-800 dark:text-slate-200 antialiased selection:bg-apple-blue selection:text-white">
 
-    <!-- Header -->
-    <header class="bg-white dark:bg-slate-900 px-6 py-3 flex justify-between items-center z-30 shadow-sm border-b border-slate-200 dark:border-slate-800">
-        <h1 class="text-xl font-bold flex items-center gap-2">
-            <i class="ph ph-graph"></i>
-            Automaton Simulator
-        </h1>
+    <!-- Empty Canvas Tutorial (Disappears on first node) -->
+    <div id="empty-state-hint" class="fixed inset-0 flex items-center justify-center pointer-events-none z-10 transition-opacity duration-300 opacity-100">
+        <div class="glass px-8 py-6 rounded-3xl shadow-glass flex flex-col items-center gap-4 text-slate-500 dark:text-slate-400">
+            <i class="ph-duotone ph-magic-wand text-4xl text-apple-blue opacity-80"></i>
+            <div class="text-center">
+                <h3 class="text-lg font-bold text-slate-800 dark:text-slate-200 mb-1">Canvas is empty</h3>
+                <p class="text-sm">Start building your automaton.</p>
+            </div>
+            <div class="flex flex-col gap-2 mt-2 text-sm font-medium w-full">
+                <div class="flex items-center gap-3 bg-white/50 dark:bg-black/50 px-4 py-2.5 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
+                    <span class="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded text-xs">Double Click</span> 
+                    <span>Add a state</span>
+                </div>
+                <div class="flex items-center gap-3 bg-white/50 dark:bg-black/50 px-4 py-2.5 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
+                    <span class="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded text-xs">Shift + Drag</span> 
+                    <span>Connect states</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SVG Canvas -->
+    <svg id="canvas">
+        <defs>
+            <pattern id="dot-grid" width="30" height="30" patternUnits="userSpaceOnUse">
+                <circle cx="2" cy="2" r="1.5" fill="#d1d5db" class="dark:fill-slate-800"></circle>
+            </pattern>
+            <marker id="arrow" viewBox="0 -5 10 10" refX="26" refY="0" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M0,-5L10,0L0,5" fill="#9ca3af" class="dark:fill-slate-500"></path>
+            </marker>
+            <marker id="arrow-selected" viewBox="0 -5 10 10" refX="26" refY="0" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M0,-5L10,0L0,5" fill="#007AFF"></path>
+            </marker>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#dot-grid)"></rect>
+        <g id="zoom-group">
+            <g id="links-layer"></g>
+            <g id="nodes-layer"></g>
+            <path class="dragline hidden" d="M0,0L0,0"></path>
+        </g>
+    </svg>
+
+    <!-- Top Toolbar -->
+    <div class="absolute top-6 left-1/2 transform -translate-x-1/2 z-20 glass rounded-full shadow-glass px-6 py-3 flex items-center gap-6 border border-slate-200 dark:border-slate-700/50">
+        <div class="font-bold tracking-tight text-base flex items-center gap-2">
+            <i class="ph-fill ph-infinity text-apple-blue text-xl"></i> AutoLab
+        </div>
+        <div class="h-5 w-px bg-slate-300 dark:bg-slate-700"></div>
         
+        <!-- Export/Import -->
         <div class="flex items-center gap-3">
-            <div id="message-box" class="opacity-0 px-4 py-1.5 rounded-lg bg-blue-500 text-white font-medium text-sm transition-opacity duration-300">
-                <!-- Temporary messages -->
-            </div>
-            
-            <!-- File Operations -->
-            <input type="file" id="import-file" class="hidden" accept=".json">
-            <button id="btn-import" class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all font-semibold text-sm flex items-center gap-1">
-                <i class="ph ph-upload-simple"></i> Import
+            <input type="file" id="import-json" class="hidden" accept=".json">
+            <button onclick="document.getElementById('import-json').click()" class="text-slate-600 dark:text-slate-300 hover:text-apple-blue transition-colors flex items-center gap-1.5 text-xs font-semibold" title="Import JSON">
+                <i class="ph ph-upload-simple text-lg"></i> Open
             </button>
-            <button id="btn-export" class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all font-semibold text-sm flex items-center gap-1">
-                <i class="ph ph-download-simple"></i> Export
+            <div class="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
+            <button onclick="exportJSON()" class="text-slate-600 dark:text-slate-300 hover:text-apple-blue transition-colors flex items-center gap-1.5 text-xs font-semibold" title="Save JSON">
+                <i class="ph ph-floppy-disk text-lg"></i> Save
             </button>
-
-            <!-- Theme Toggle -->
-            <button id="btn-theme" class="p-2 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all text-lg flex items-center justify-center">
-                <i id="theme-icon" class="ph ph-moon"></i>
+            <button onclick="exportPNG()" class="text-slate-600 dark:text-slate-300 hover:text-apple-blue transition-colors flex items-center gap-1.5 text-xs font-semibold" title="Export PNG">
+                <i class="ph ph-image text-lg"></i> PNG
+            </button>
+            <button onclick="exportSVG()" class="text-slate-600 dark:text-slate-300 hover:text-apple-blue transition-colors flex items-center gap-1.5 text-xs font-semibold" title="Export SVG">
+                <i class="ph ph-file-svg text-lg"></i> SVG
             </button>
         </div>
-    </header>
 
-    <!-- Main Workspace -->
-    <div class="flex flex-1 overflow-hidden relative">
-        
-        <!-- Sidebar SX -->
-        <aside id="sidebar-left" class="w-80 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 z-20 transition-[width] duration-300 relative flex flex-col shrink-0 shadow-lg shadow-slate-200/50 dark:shadow-none">
-            <button id="btn-toggle-left" class="absolute -right-4 top-1/2 transform -translate-y-1/2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full p-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 z-30 flex items-center justify-center shadow-sm">
-                <i id="icon-left" class="ph ph-caret-left text-lg"></i>
-            </button>
-
-            <div class="w-full flex-1 overflow-hidden relative">
-                <div class="w-80 h-full overflow-y-auto flex flex-col absolute top-0 left-0">
-                    
-                    <!-- Tools -->
-                    <div class="p-5 border-b border-slate-100 dark:border-slate-800/80">
-                        <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Drawing Tools</h2>
-                        
-                        <div class="flex gap-2 mb-2">
-                            <button id="btn-mode-select" class="flex-1 py-2 px-3 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30 font-semibold text-sm flex items-center justify-center gap-1 transition-all shadow-sm">
-                                <i class="ph ph-cursor-click"></i> Select
-                            </button>
-                            <button id="btn-mode-pan" class="flex-1 py-2 px-3 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 font-semibold text-sm flex items-center justify-center gap-1 transition-all">
-                                <i class="ph ph-hand-palm"></i> Pan
-                            </button>
-                        </div>
-                        <div class="flex gap-2">
-                            <button id="btn-mode-node" class="flex-1 py-2 px-3 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 font-semibold text-sm flex items-center justify-center gap-1 transition-all">
-                                <i class="ph ph-circle-plus"></i> State
-                            </button>
-                            <button id="btn-mode-link" class="flex-1 py-2 px-3 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 font-semibold text-sm flex items-center justify-center gap-1 transition-all">
-                                <i class="ph ph-arrow-right"></i> Transition
-                            </button>
-                        </div>
-                        <p class="text-[11px] text-slate-500 dark:text-slate-500 mt-3 leading-tight" id="mode-hint">
-                            Selection mode: click to select, drag to move. Use Del to delete. Ctrl+Z to Undo.
-                        </p>
-                    </div>
-
-                    <!-- NEW: Modern Properties Panel -->
-                    <div class="p-5 flex-1 flex flex-col">
-                        <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Selection Properties</h2>
-                        
-                        <!-- Empty State -->
-                        <div id="panel-empty" class="text-sm text-slate-500 dark:text-slate-400 py-8 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl flex flex-col items-center justify-center gap-3 transition-all">
-                            <i class="ph ph-cursor-click text-3xl text-slate-400 dark:text-slate-500"></i>
-                            <span class="font-medium">No element selected</span>
-                        </div>
-                        
-                        <!-- Multiple Elements Selected -->
-                        <div id="panel-multi" class="hidden flex flex-col gap-4">
-                            <div class="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col gap-3 text-center">
-                                <span class="text-sm font-semibold text-slate-700 dark:text-slate-300" id="multi-count">Multiple elements selected</span>
-                            </div>
-                            <button id="btn-delete-multi" class="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95">
-                                <i class="ph ph-trash text-lg"></i> Delete Selected (Del)
-                            </button>
-                        </div>
-
-                        <!-- Single Node Selected -->
-                        <div id="panel-node" class="hidden flex flex-col gap-4">
-                            <div class="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col gap-4">
-                                <div>
-                                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">State Name</label>
-                                    <input type="text" id="prop-node-name" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-800 dark:text-slate-100">
-                                </div>
-                                <div class="w-full h-px bg-slate-200 dark:bg-slate-700"></div>
-                                <div class="flex flex-col gap-3">
-                                    <label class="flex items-center justify-between cursor-pointer group">
-                                        <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Start State</span>
-                                        <div class="relative">
-                                            <input type="checkbox" id="prop-node-start" class="sr-only peer">
-                                            <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-slate-600 peer-checked:bg-blue-500"></div>
-                                        </div>
-                                    </label>
-                                    <label class="flex items-center justify-between cursor-pointer group">
-                                        <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Final State</span>
-                                        <div class="relative">
-                                            <input type="checkbox" id="prop-node-final" class="sr-only peer">
-                                            <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-slate-600 peer-checked:bg-blue-500"></div>
-                                        </div>
-                                    </label>
-                                </div>
-                            </div>
-                            <button id="btn-delete-node" class="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95">
-                                <i class="ph ph-trash text-lg"></i> Delete State (Del)
-                            </button>
-                        </div>
-
-                        <!-- Single Link Selected -->
-                        <div id="panel-link" class="hidden flex flex-col gap-4">
-                            <div class="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col gap-3">
-                                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-0.5">Transition Symbols</label>
-                                <div class="flex gap-2">
-                                    <input type="text" id="prop-link-label" class="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-800 dark:text-slate-100">
-                                    <button id="btn-add-epsilon-panel" class="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 rounded-lg text-sm font-bold shadow-sm transition-all active:scale-95 flex items-center justify-center" title="Add Epsilon">
-                                        ε
-                                    </button>
-                                </div>
-                            </div>
-                            <button id="btn-delete-link" class="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95">
-                                <i class="ph ph-trash text-lg"></i> Delete Transition (Del)
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </aside>
-
-        <!-- Central Canvas -->
-        <main class="flex-1 relative z-10 bg-slate-50 dark:bg-slate-950" id="canvas-container">
-            <!-- Zoom Panel -->
-            <div class="absolute bottom-6 right-6 flex flex-col gap-2 z-20">
-                <div class="bg-white dark:bg-slate-900 rounded-lg shadow-md border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden">
-                    <button id="btn-zoom-in" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 border-b border-slate-200 dark:border-slate-800 transition-colors" title="Zoom In"><i class="ph ph-plus"></i></button>
-                    <button id="btn-zoom-reset" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 border-b border-slate-200 dark:border-slate-800 font-bold text-xs transition-colors" title="Reset Zoom">1:1</button>
-                    <button id="btn-zoom-out" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="Zoom Out"><i class="ph ph-minus"></i></button>
-                </div>
-            </div>
-            <!-- D3 SVG appended here -->
-        </main>
-
-        <!-- Sidebar DX: Simulazione -->
-        <aside id="sidebar-right" class="w-80 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 z-20 transition-[width] duration-300 relative flex flex-col shrink-0 shadow-lg shadow-slate-200/50 dark:shadow-none">
-            <button id="btn-toggle-right" class="absolute -left-4 top-1/2 transform -translate-y-1/2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full p-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 z-30 flex items-center justify-center shadow-sm">
-                <i id="icon-right" class="ph ph-caret-right text-lg"></i>
-            </button>
-
-            <div class="w-full flex-1 overflow-hidden relative">
-                <div class="w-80 h-full flex flex-col p-5 absolute top-0 right-0">
-                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Simulation</h2>
-                    
-                    <div class="mb-3 shrink-0">
-                        <label class="block text-xs font-semibold mb-1">Alphabet (optional)</label>
-                        <input type="text" id="sim-alphabet" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="e.g. a,b">
-                    </div>
-
-                    <div class="mb-4 shrink-0">
-                        <label class="block text-xs font-semibold mb-1">Input String</label>
-                        <input type="text" id="sim-input" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono transition-all" placeholder="Enter string...">
-                    </div>
-
-                    <div class="flex flex-col gap-2 mb-4 shrink-0">
-                        <button id="btn-sim-quick" class="w-full py-2 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition-all active:scale-95 flex justify-center items-center gap-2">
-                            <i class="ph ph-lightning"></i> Quick Simulation
-                        </button>
-                        <div class="flex gap-2">
-                            <button id="btn-sim-start-step" class="flex-1 py-2 bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900 rounded-lg font-semibold text-sm hover:bg-slate-900 dark:hover:bg-white transition-all active:scale-95 flex justify-center items-center gap-1">
-                                <i class="ph ph-play"></i> Step by Step
-                            </button>
-                            <button id="btn-sim-stop" class="hidden flex-1 py-2 bg-rose-500 text-white rounded-lg font-semibold text-sm hover:bg-rose-600 transition-all active:scale-95 flex justify-center items-center gap-1">
-                                <i class="ph ph-stop"></i> Stop
-                            </button>
-                        </div>
-                        <button id="btn-sim-next" class="hidden w-full py-2.5 bg-emerald-500 text-white rounded-lg font-bold text-sm hover:bg-emerald-600 active:scale-95 disabled:opacity-50 disabled:pointer-events-none transition-all flex justify-center items-center gap-1">
-                            Next Step <i class="ph ph-arrow-right-bold"></i>
-                        </button>
-                    </div>
-
-                    <div id="sim-status" class="bg-slate-900 border border-slate-800 rounded-lg p-3 text-[13px] flex-1 overflow-y-auto font-mono shadow-inner text-slate-300">
-                        <div class="text-slate-500 italic flex items-start"><span class="mr-2 text-slate-600">></span>Waiting for input...</div>
-                    </div>
-                </div>
-            </div>
-        </aside>
+        <div class="h-5 w-px bg-slate-300 dark:bg-slate-700"></div>
+        <button onclick="toggleTheme()" class="text-slate-600 dark:text-slate-300 hover:text-apple-blue transition-colors">
+            <i id="theme-icon" class="ph ph-moon text-lg"></i>
+        </button>
     </div>
 
-    <!-- Modale Transizione -->
-    <div id="modal-transition" class="hidden fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 transition-opacity">
-        <div class="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-80 overflow-hidden transform transition-all border border-slate-200 dark:border-slate-800">
-            <div class="px-5 py-4 border-b border-slate-100 dark:border-slate-800">
-                <h3 class="text-lg font-bold">New Transition</h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Enter comma-separated symbols.</p>
+    <!-- Floating Inspector (Right) -->
+    <div class="absolute top-24 right-6 w-80 z-20 glass rounded-2xl shadow-glass flex flex-col max-h-[calc(100vh-8rem)] transition-all duration-300 opacity-0 pointer-events-none translate-x-4 border border-slate-200 dark:border-slate-700/50" id="inspector-panel">
+        <div class="px-5 py-4 border-b border-slate-200/50 dark:border-slate-700/50 flex justify-between items-center bg-white/40 dark:bg-black/40 rounded-t-2xl">
+            <h3 class="text-sm font-semibold tracking-tight" id="inspector-title">Properties</h3>
+            <button onclick="clearSelection()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><i class="ph ph-x"></i></button>
+        </div>
+        <div class="p-5 flex flex-col gap-5 overflow-y-auto" id="inspector-content">
+            <!-- Dynamically populated -->
+        </div>
+    </div>
+
+    <!-- Floating Tools (Left) -->
+    <div class="absolute top-24 left-6 w-80 z-20 glass rounded-2xl shadow-glass flex flex-col max-h-[calc(100vh-8rem)] overflow-hidden border border-slate-200 dark:border-slate-700/50">
+        <!-- Tabs -->
+        <div class="p-2 border-b border-slate-200/50 dark:border-slate-700/50 bg-white/40 dark:bg-black/40">
+            <div class="flex bg-slate-200/50 dark:bg-slate-800/50 rounded-xl p-1 gap-1">
+                <button onclick="switchTab('sim')" id="tab-sim" class="flex-1 text-[11px] font-semibold py-1.5 rounded-lg bg-white dark:bg-slate-700 shadow-sm transition-all text-slate-800 dark:text-slate-200">Simulate</button>
+                <button onclick="switchTab('batch')" id="tab-batch" class="flex-1 text-[11px] font-semibold py-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all">Batch</button>
+                <button onclick="switchTab('regex')" id="tab-regex" class="flex-1 text-[11px] font-semibold py-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all">Regex</button>
+                <button onclick="switchTab('tools')" id="tab-tools" class="flex-1 text-[11px] font-semibold py-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all">Tools</button>
             </div>
-            <div class="p-5">
-                <input type="text" id="modal-input" class="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all mb-3" placeholder="e.g. a, b" autocomplete="off">
-                <div class="flex gap-2">
-                    <button id="modal-btn-epsilon" class="py-1 px-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold transition-all">
-                        Insert Epsilon (ε)
-                    </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto relative">
+            <!-- Simulation Tab -->
+            <div id="view-sim" class="p-5 flex flex-col gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1.5">Input String</label>
+                    <input type="text" id="sim-input" class="w-full bg-white/60 dark:bg-black/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-apple-blue font-mono transition-shadow shadow-inner" placeholder="">
+                </div>
+                <div class="flex gap-2" id="sim-start-controls">
+                    <button onclick="quickSimulation()" class="flex-1 bg-apple-blue hover:bg-blue-600 text-white text-xs font-bold py-2.5 rounded-xl transition-all shadow-sm active:scale-95">Quick Run</button>
+                    <button onclick="startStepSimulation()" class="flex-1 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 text-xs font-bold py-2.5 rounded-xl transition-all shadow-sm active:scale-95">Step-by-Step</button>
+                </div>
+                
+                <div id="step-controls" class="hidden flex gap-2">
+                    <button onclick="nextStep()" class="flex-1 bg-apple-green hover:bg-green-600 text-white text-xs font-bold py-2.5 rounded-xl transition-all shadow-sm active:scale-95 flex justify-center items-center gap-1">Next <i class="ph ph-arrow-right"></i></button>
+                    <button onclick="stopSimulation()" class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 text-xs font-bold px-4 rounded-xl transition-all active:scale-95"><i class="ph ph-stop"></i></button>
+                </div>
+
+                <!-- Modern Timeline Log -->
+                <div class="mt-2 flex-1 min-h-[160px] max-h-64 overflow-y-auto bg-white/30 dark:bg-black/30 border border-slate-200/50 dark:border-slate-700/50 rounded-xl p-3 shadow-inner">
+                    <div id="sim-timeline" class="flex flex-col gap-2">
+                        <div class="text-xs text-slate-400 italic text-center mt-4">Simulation logs will appear here.</div>
+                    </div>
                 </div>
             </div>
-            <div class="bg-slate-50 dark:bg-slate-950 px-5 py-3 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
-                <button id="modal-btn-cancel" class="px-4 py-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg font-semibold text-sm transition-all">Cancel</button>
-                <button id="modal-btn-ok" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-all">Confirm</button>
+
+            <!-- Batch Tab -->
+            <div id="view-batch" class="hidden p-5 flex flex-col gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1.5">Test Strings (One per line)</label>
+                    <textarea id="batch-input" class="w-full h-32 bg-white/60 dark:bg-black/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-apple-blue font-mono transition-shadow shadow-inner resize-none" placeholder=""></textarea>
+                </div>
+                <button onclick="runBatch()" class="w-full bg-apple-blue hover:bg-blue-600 text-white text-xs font-bold py-2.5 rounded-xl transition-all shadow-sm active:scale-95">Run All</button>
+                <div class="mt-2 flex-1 max-h-40 overflow-y-auto bg-white/30 dark:bg-black/30 border border-slate-200/50 dark:border-slate-700/50 rounded-xl shadow-inner">
+                    <ul id="batch-results" class="divide-y divide-slate-200/50 dark:divide-slate-700/50">
+                        <li class="p-3 text-center text-xs text-slate-400 italic">Results appear here</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Regex Tab -->
+            <div id="view-regex" class="hidden p-5 flex flex-col gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1.5">Regular Expression</label>
+                    <input type="text" id="regex-input" class="w-full bg-white/60 dark:bg-black/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-apple-blue font-mono transition-shadow shadow-inner" placeholder="(a|b)*abb">
+                    <p class="text-[10px] text-slate-400 mt-2 leading-relaxed">Supported: <code class="bg-slate-200 dark:bg-slate-800 px-1 rounded">|</code>, <code class="bg-slate-200 dark:bg-slate-800 px-1 rounded">*</code>, implicit concatenation, and parentheses.</p>
+                </div>
+                <button onclick="generateFromRegex()" class="w-full bg-apple-blue hover:bg-blue-600 text-white text-xs font-bold py-2.5 rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2">
+                    <i class="ph ph-magic-wand"></i> Generate NFA
+                </button>
+            </div>
+
+            <!-- Tools Tab -->
+            <div id="view-tools" class="hidden p-5 flex flex-col gap-3">
+                <button onclick="convertNfaToDfa()" class="w-full text-left px-4 py-3 bg-white/50 dark:bg-black/50 hover:bg-white dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all flex items-center justify-between group">
+                    <div>
+                        <div class="text-sm font-semibold">NFA to DFA</div>
+                        <div class="text-[10px] text-slate-500 mt-0.5">Subset construction</div>
+                    </div>
+                    <i class="ph ph-magic-wand text-slate-400 group-hover:text-apple-blue transition-colors"></i>
+                </button>
+                <button onclick="minimizeDfa()" class="w-full text-left px-4 py-3 bg-white/50 dark:bg-black/50 hover:bg-white dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all flex items-center justify-between group">
+                    <div>
+                        <div class="text-sm font-semibold">Minimize DFA</div>
+                        <div class="text-[10px] text-slate-500 mt-0.5">Hopcroft's algorithm</div>
+                    </div>
+                    <i class="ph ph-scissors text-slate-400 group-hover:text-apple-blue transition-colors"></i>
+                </button>
+                <button onclick="autoLayout()" class="w-full text-left px-4 py-3 bg-white/50 dark:bg-black/50 hover:bg-white dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all flex items-center justify-between group">
+                    <div>
+                        <div class="text-sm font-semibold">Auto-Layout</div>
+                        <div class="text-[10px] text-slate-500 mt-0.5">Organize nodes automatically</div>
+                    </div>
+                    <i class="ph ph-intersect text-slate-400 group-hover:text-apple-blue transition-colors"></i>
+                </button>
+                <button onclick="clearCanvas()" class="w-full text-left px-4 py-3 mt-4 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-xl transition-all flex items-center justify-between group text-rose-600 dark:text-rose-400">
+                    <div class="text-sm font-semibold">Clear Canvas</div>
+                    <i class="ph ph-trash"></i>
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Logica Applicazione -->
+    <!-- Edge Creation Prompt Modal -->
+    <div id="edge-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm transition-opacity">
+        <div class="glass w-80 rounded-2xl shadow-float p-6 fade-in border border-slate-200 dark:border-slate-700">
+            <h3 class="text-lg font-bold mb-1 text-slate-800 dark:text-slate-100">New Transition</h3>
+            <p class="text-xs text-slate-500 mb-4">Enter symbols separated by commas. Use 'eps' for epsilon.</p>
+            <input type="text" id="edge-input" class="w-full bg-white/70 dark:bg-black/70 border border-slate-300 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-apple-blue focus:ring-1 focus:ring-apple-blue font-mono mb-5" placeholder="">
+            <div class="flex justify-end gap-2">
+                <button onclick="cancelEdge()" class="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+                <button onclick="confirmEdge()" class="px-4 py-2 rounded-xl text-sm font-bold bg-apple-blue hover:bg-blue-600 text-white shadow-sm transition-colors">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="absolute bottom-10 left-1/2 transform -translate-x-1/2 glass px-4 py-2 rounded-full shadow-lg text-sm font-medium transition-all duration-300 opacity-0 translate-y-4 pointer-events-none z-50 flex items-center gap-2">
+        <i class="ph-fill ph-info text-apple-blue"></i> <span id="toast-msg"></span>
+    </div>
+
     <script>
-        // --- Theme Toggle ---
-        const html = document.documentElement;
-        const themeBtn = document.getElementById('btn-theme');
-        const themeIcon = document.getElementById('theme-icon');
-        
-        themeBtn.addEventListener('click', () => {
-            if (html.classList.contains('dark')) {
-                html.classList.remove('dark');
-                themeIcon.classList.replace('ph-sun', 'ph-moon');
-            } else {
-                html.classList.add('dark');
-                themeIcon.classList.replace('ph-moon', 'ph-sun');
-            }
-        });
-
-        // --- Export & Import ---
-        document.getElementById('btn-export').addEventListener('click', async () => {
-            const dataStr = JSON.stringify(serializeGraph(), null, 2);
-            
-            try {
-                if (window.showSaveFilePicker) {
-                    const handle = await window.showSaveFilePicker({
-                        suggestedName: 'automaton.json',
-                        types: [{
-                            description: 'JSON File',
-                            accept: {'application/json': ['.json']},
-                        }],
-                    });
-                    const writable = await handle.createWritable();
-                    await writable.write(dataStr);
-                    await writable.close();
-                    showMessage("Automaton exported successfully!", "success");
-                } else {
-                    // Fallback for browsers that don't support the File System Access API
-                    const blob = new Blob([dataStr], { type: "application/json" });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'automaton.json';
-                    a.click();
-                    URL.revokeObjectURL(url);
-                    showMessage("Automaton exported!", "success");
-                }
-            } catch (err) {
-                if (err.name !== 'AbortError') {
-                    showMessage("Failed to export file.", "error");
-                }
-            }
-        });
-
-        document.getElementById('btn-import').addEventListener('click', () => {
-            document.getElementById('import-file').click();
-        });
-
-        document.getElementById('import-file').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                try {
-                    const parsed = JSON.parse(event.target.result);
-                    saveState(); 
-                    deserializeGraph(parsed);
-                    showMessage("Automaton imported successfully!", "success");
-                } catch (err) {
-                    showMessage("Error parsing JSON file.", "error");
-                }
-            };
-            reader.readAsText(file);
-            e.target.value = '';
-        });
-
-        // --- Sidebar Toggles ---
-        const sidebarLeft = document.getElementById('sidebar-left');
-        const iconLeft = document.getElementById('icon-left');
-        document.getElementById('btn-toggle-left').addEventListener('click', () => {
-            if(sidebarLeft.classList.contains('w-80')) {
-                sidebarLeft.classList.replace('w-80', 'w-0');
-                iconLeft.classList.replace('ph-caret-left', 'ph-caret-right');
-            } else {
-                sidebarLeft.classList.replace('w-0', 'w-80');
-                iconLeft.classList.replace('ph-caret-right', 'ph-caret-left');
-            }
-        });
-
-        const sidebarRight = document.getElementById('sidebar-right');
-        const iconRight = document.getElementById('icon-right');
-        document.getElementById('btn-toggle-right').addEventListener('click', () => {
-            if(sidebarRight.classList.contains('w-80')) {
-                sidebarRight.classList.replace('w-80', 'w-0');
-                iconRight.classList.replace('ph-caret-right', 'ph-caret-left');
-            } else {
-                sidebarRight.classList.replace('w-0', 'w-80');
-                iconRight.classList.replace('ph-caret-left', 'ph-caret-right');
-            }
-        });
-
-        // --- Stato Globale e Dati ---
+        // --- Core Data & Config ---
         const EPSILON = 'ε';
-        const NODE_RADIUS = 26;
-
+        const NODE_R = 24;
         let nodes = [];
         let links = [];
-        let nodeIdCounter = 0;
+        let nId = 0, lId = 0;
         
-        let mode = 'select'; // select, pan, node, link
-        
-        let selectedNodes = new Set();
-        let selectedLinks = new Set();
-        
-        let isSelecting = false;
-        let justDraggedBox = false; 
-        let selectionBox = { x1: 0, y1: 0, x2: 0, y2: 0 };
-        
-        let isSimulating = false;
-        let simString = "";
-        let simIndex = 0;
-        let activeStates = new Set();
+        let selectedEl = null;
+        let selectedType = null;
+        let pendingEdge = null; 
 
-        let undoStack = [];
-        let redoStack = [];
+        // --- D3 Canvas Setup ---
+        const svg = d3.select("#canvas");
+        const zoomGroup = svg.select("#zoom-group");
+        const linksLayer = zoomGroup.select("#links-layer");
+        const nodesLayer = zoomGroup.select("#nodes-layer");
+        const dragLine = zoomGroup.select(".dragline");
+        const emptyHint = document.getElementById("empty-state-hint");
 
-        function serializeGraph() {
-            return {
-                nodeIdCounter: nodeIdCounter,
-                nodes: nodes.map(n => ({ ...n })),
-                links: links.map(l => ({ source: l.source.id, target: l.target.id, label: l.label }))
-            };
-        }
+        const zoom = d3.zoom().scaleExtent([0.2, 3]).on("zoom", e => zoomGroup.attr("transform", e.transform));
+        svg.call(zoom).on("dblclick.zoom", null);
 
-        function deserializeGraph(state) {
-            nodeIdCounter = state.nodeIdCounter || 0;
-            nodes = (state.nodes || []).map(n => ({ ...n }));
-            links = (state.links || []).map(l => {
-                return {
-                    source: nodes.find(n => n.id === l.source),
-                    target: nodes.find(n => n.id === l.target),
-                    label: l.label
-                };
-            }).filter(l => l.source && l.target); 
-            clearSelection();
-            updateGraph();
-        }
+        // --- Global Interactions ---
+        svg.on("dblclick", (e) => {
+            if (e.target.tagName !== 'svg' && e.target.tagName !== 'rect') return;
+            let [x, y] = d3.pointer(e, zoomGroup.node());
+            addNode(x, y);
+        });
 
-        function saveState() {
-            redoStack = []; 
-            undoStack.push(serializeGraph());
-            if (undoStack.length > 50) undoStack.shift(); 
-        }
+        svg.on("click", (e) => {
+            if (e.target.tagName === 'svg' || e.target.tagName === 'rect') clearSelection();
+        });
 
-        function undo() {
-            if (isSimulating || undoStack.length === 0) return;
-            redoStack.push(serializeGraph());
-            let state = undoStack.pop();
-            deserializeGraph(state);
-            showMessage("Undo successful", "info");
-        }
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || !document.getElementById('edge-modal').classList.contains('hidden')) return;
+            if (e.key === 'Backspace' || e.key === 'Delete') deleteSelected();
+        });
 
-        function redo() {
-            if (isSimulating || redoStack.length === 0) return;
-            undoStack.push(serializeGraph());
-            let state = redoStack.pop();
-            deserializeGraph(state);
-            showMessage("Redo successful", "info");
-        }
+        // Node Drag & Link Creation
+        let isDrawing = false;
+        let drawingSource = null;
 
-        // --- D3 Init ---
-        const container = document.getElementById('canvas-container');
-        const svg = d3.select("#canvas-container").append("svg")
-            .on("mousedown", handleSvgMouseDown)
-            .on("mousemove", handleSvgMouseMove)
-            .on("mouseup", handleSvgMouseUp)
-            .on("mouseleave", handleSvgMouseUp)
-            .on("click", handleSvgClick);
-
-        const zoomGroup = svg.append("g").attr("id", "zoom-group");
-
-        const zoomBehavior = d3.zoom()
-            .scaleExtent([0.1, 5])
-            .filter((event) => {
-                if (event.type === 'wheel') return true;
-                if (event.button === 1) return true; 
-                if (mode === 'pan' && event.button === 0) return true;
-                return false;
+        const nodeDrag = d3.drag()
+            .on("start", function(e, d) {
+                if (e.sourceEvent.shiftKey) {
+                    isDrawing = true; drawingSource = d;
+                    dragLine.classed("hidden", false).attr("d", `M${d.x},${d.y} L${d.x},${d.y}`);
+                } else {
+                    selectEl(d, 'node'); d3.select(this).raise();
+                }
             })
-            .on("zoom", (event) => {
-                zoomGroup.attr("transform", event.transform);
-            });
-
-        svg.call(zoomBehavior).on("dblclick.zoom", null);
-
-        document.getElementById('btn-zoom-in').addEventListener('click', () => svg.transition().call(zoomBehavior.scaleBy, 1.3));
-        document.getElementById('btn-zoom-out').addEventListener('click', () => svg.transition().call(zoomBehavior.scaleBy, 0.77));
-        document.getElementById('btn-zoom-reset').addEventListener('click', () => svg.transition().call(zoomBehavior.transform, d3.zoomIdentity));
-
-        const defs = svg.append("defs");
-        defs.append("marker").attr("id", "arrowhead").attr("viewBox", "-0 -5 10 10").attr("refX", NODE_RADIUS + 7).attr("refY", 0).attr("orient", "auto").attr("markerWidth", 7).attr("markerHeight", 7).attr("xoverflow", "visible").append("svg:path").attr("d", "M 0,-5 L 10 ,0 L 0,5").attr("fill", "#94a3b8").style("stroke", "none");
-        defs.append("marker").attr("id", "arrowhead-selected").attr("viewBox", "-0 -5 10 10").attr("refX", NODE_RADIUS + 7).attr("refY", 0).attr("orient", "auto").attr("markerWidth", 7).attr("markerHeight", 7).attr("xoverflow", "visible").append("svg:path").attr("d", "M 0,-5 L 10 ,0 L 0,5").attr("fill", "#0ea5e9").style("stroke", "none");
-
-        const linkGroup = zoomGroup.append("g").attr("class", "links");
-        const nodeGroup = zoomGroup.append("g").attr("class", "nodes");
-        let dragLine = zoomGroup.append("path").attr("class", "dragline hidden").attr("d", "M0,0L0,0");
-        let selectionRect = zoomGroup.append("rect").attr("class", "selection-box hidden");
-        
-        let mousedownNode = null;
-        let dragSnapshot = null; 
-
-        function handleSvgMouseDown(event) {
-            if (isSimulating || event.target.tagName !== 'svg') return;
-            if (mode === 'pan') return; 
-            
-            if (mode === 'select') {
-                let p = d3.pointer(event, zoomGroup.node());
-                isSelecting = true;
-                selectionBox.x1 = p[0];
-                selectionBox.y1 = p[1];
-                selectionBox.x2 = p[0];
-                selectionBox.y2 = p[1];
-                
-                if (!event.shiftKey) clearSelection();
-                
-                selectionRect.attr("x", p[0]).attr("y", p[1]).attr("width", 0).attr("height", 0).classed("hidden", false);
-            }
-        }
-
-        function handleSvgMouseMove(event) {
-            if (isSelecting) {
-                let p = d3.pointer(event, zoomGroup.node());
-                selectionBox.x2 = p[0];
-                selectionBox.y2 = p[1];
-                
-                let minX = Math.min(selectionBox.x1, selectionBox.x2);
-                let maxX = Math.max(selectionBox.x1, selectionBox.x2);
-                let minY = Math.min(selectionBox.y1, selectionBox.y2);
-                let maxY = Math.max(selectionBox.y1, selectionBox.y2);
-
-                selectionRect.attr("x", minX).attr("y", minY).attr("width", maxX - minX).attr("height", maxY - minY);
-            }
-        }
-
-        function handleSvgMouseUp(event) {
-            if (isSelecting) {
-                isSelecting = false;
-                selectionRect.classed("hidden", true);
-                
-                let minX = Math.min(selectionBox.x1, selectionBox.x2);
-                let maxX = Math.max(selectionBox.x1, selectionBox.x2);
-                let minY = Math.min(selectionBox.y1, selectionBox.y2);
-                let maxY = Math.max(selectionBox.y1, selectionBox.y2);
-                
-                if (maxX - minX > 5 || maxY - minY > 5) {
-                    justDraggedBox = true;
-                    setTimeout(() => justDraggedBox = false, 50); 
-
-                    nodes.forEach(n => {
-                        if (n.x >= minX && n.x <= maxX && n.y >= minY && n.y <= maxY) {
-                            selectedNodes.add(n);
+            .on("drag", (e, d) => {
+                if (isDrawing) {
+                    let [px, py] = d3.pointer(e, zoomGroup.node());
+                    dragLine.attr("d", `M${drawingSource.x},${drawingSource.y} L${px},${py}`);
+                } else {
+                    d.x += e.dx; d.y += e.dy;
+                    // Auto-update incident links control points to follow node movement roughly
+                    links.forEach(l => {
+                        if(l.source === d || l.target === d) {
+                            if(!l.customCp) l.cp = computeDefaultCP(l.source, l.target);
+                            else { l.cp.x += e.dx*0.5; l.cp.y += e.dy*0.5; } 
                         }
                     });
-                    links.forEach(l => {
-                        if (selectedNodes.has(l.source) && selectedNodes.has(l.target)) selectedLinks.add(l);
-                    });
-                    updateGraph();
+                    render();
                 }
-            }
-        }
-
-        function handleSvgClick(event) {
-            if (isSimulating || isSelecting || justDraggedBox) return; 
-            
-            if (mode === 'node' && event.target.tagName === 'svg') {
-                saveState(); 
-                let p = d3.pointer(event, zoomGroup.node());
-                addNode(p[0], p[1]);
-            } else if (mode === 'select' && event.target.tagName === 'svg') {
-                clearSelection();
-                updateGraph();
-            }
-        }
-
-        function updateGraph() {
-            let linkElements = linkGroup.selectAll("g.link-group")
-                .data(links, d => d.source.id + "-" + d.target.id);
-
-            linkElements.exit().remove();
-            let linkEnter = linkElements.enter().append("g").attr("class", "link-group");
-
-            linkEnter.append("path").attr("class", "link")
-                .on("click", (event, d) => {
-                    if (mode === 'select' && !isSimulating) {
-                        if (!event.shiftKey) clearSelection();
-                        selectedLinks.add(d);
-                        updateGraph();
-                        event.stopPropagation();
-                    }
-                });
-
-            linkEnter.append("text").attr("class", "link-label-bg").attr("text-anchor", "middle").attr("dy", -6);
-            linkEnter.append("text").attr("class", "link-label").attr("text-anchor", "middle").attr("dy", -6);
-
-            linkElements = linkEnter.merge(linkElements);
-
-            linkElements.select("path")
-                .classed("selected", d => selectedLinks.has(d))
-                .attr("marker-end", d => selectedLinks.has(d) ? "url(#arrowhead-selected)" : "url(#arrowhead)")
-                .attr("d", calculateLinkPath);
-
-            linkElements.select(".link-label")
-                .text(d => d.label).attr("x", d => getLabelPosition(d).x).attr("y", d => getLabelPosition(d).y);
-                
-            linkElements.select(".link-label-bg")
-                .text(d => d.label).attr("x", d => getLabelPosition(d).x).attr("y", d => getLabelPosition(d).y);
-
-            let nodeElements = nodeGroup.selectAll("g.node")
-                .data(nodes, d => d.id);
-
-            nodeElements.exit().remove();
-
-            let nodeEnter = nodeElements.enter().append("g").attr("class", "node")
-                .call(d3.drag()
-                    .on("start", dragstarted)
-                    .on("drag", dragged)
-                    .on("end", dragended))
-                .on("click", (event, d) => {
-                    if (isSimulating) return;
-                    if (mode === 'select') {
-                        if (!event.shiftKey && !selectedNodes.has(d)) clearSelection();
-                        selectedNodes.add(d);
-                        updateGraph();
-                    }
-                    event.stopPropagation();
-                });
-
-            nodeEnter.append("path").attr("class", "start-arrow").attr("d", `M ${-NODE_RADIUS - 35} 0 L ${-NODE_RADIUS - 2} 0 M ${-NODE_RADIUS - 12} -6 L ${-NODE_RADIUS - 2} 0 L ${-NODE_RADIUS - 12} 6`).attr("stroke", "#1e293b").attr("stroke-width", 2.5).attr("fill", "none").attr("stroke-linejoin", "round").attr("stroke-linecap", "round");
-            nodeEnter.append("circle").attr("class", "main-circle").attr("r", NODE_RADIUS);
-            nodeEnter.append("circle").attr("class", "inner hidden").attr("r", NODE_RADIUS - 6);
-            nodeEnter.append("text").text(d => d.name);
-
-            nodeElements = nodeEnter.merge(nodeElements);
-
-            nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
-            nodeElements.classed("selected", d => selectedNodes.has(d));
-            nodeElements.classed("active", d => activeStates.has(d.id));
-            nodeElements.classed("final", d => d.isFinal);
-            
-            nodeElements.select(".start-arrow").style("display", d => d.isStart ? "block" : "none");
-            nodeElements.select(".inner").classed("hidden", d => !d.isFinal);
-            nodeElements.select("text").text(d => d.name);
-
-            updateSidebar();
-        }
-
-        function calculateLinkPath(d) {
-            if (d.source === d.target) return `M ${d.source.x - 8},${d.source.y - NODE_RADIUS + 2} C ${d.source.x - 30},${d.source.y - NODE_RADIUS - 40} ${d.source.x + 30},${d.source.y - NODE_RADIUS - 40} ${d.source.x + 8},${d.source.y - NODE_RADIUS + 2}`;
-            let bidi = links.find(l => l.source === d.target && l.target === d.source);
-            if (bidi) {
-                let dx = d.target.x - d.source.x, dy = d.target.y - d.source.y;
-                let dr = Math.sqrt(dx * dx + dy * dy) * 1.5;
-                return `M ${d.source.x},${d.source.y} A ${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
-            }
-            return `M ${d.source.x},${d.source.y} L ${d.target.x},${d.target.y}`;
-        }
-        function getLabelPosition(d) {
-            if (d.source === d.target) return { x: d.source.x, y: d.source.y - NODE_RADIUS - 30 };
-            let bidi = links.find(l => l.source === d.target && l.target === d.source);
-            if (bidi) {
-                let dx = d.target.x - d.source.x, dy = d.target.y - d.source.y;
-                let dr = Math.sqrt(dx * dx + dy * dy);
-                return { x: d.source.x + (dx / 2) - (dy / dr) * 20, y: d.source.y + (dy / 2) + (dx / dr) * 20 };
-            }
-            return { x: (d.source.x + d.target.x) / 2, y: (d.source.y + d.target.y) / 2 };
-        }
-
-        function dragstarted(event, d) {
-            if (isSimulating) return;
-            dragSnapshot = serializeGraph(); 
-
-            if (mode === 'select') {
-                if (!selectedNodes.has(d)) {
-                    if (!event.sourceEvent.shiftKey) clearSelection();
-                    selectedNodes.add(d);
-                    updateGraph();
+            })
+            .on("end", (e, d) => {
+                if (isDrawing) {
+                    dragLine.classed("hidden", true);
+                    let [px, py] = d3.pointer(e, zoomGroup.node());
+                    let target = nodes.find(n => Math.hypot(n.x - px, n.y - py) < NODE_R * 1.5);
+                    if (target) promptEdge(drawingSource, target);
+                    isDrawing = false; drawingSource = null;
                 }
-                d3.select(this).raise();
-            } else if (mode === 'link') {
-                mousedownNode = d;
-                dragLine.classed("hidden", false).attr("d", `M${d.x},${d.y}L${d.x},${d.y}`);
-            }
-        }
+            });
 
-        function dragged(event, d) {
-            if (isSimulating) return;
-            if (mode === 'select') {
-                selectedNodes.forEach(node => {
-                    node.x += event.dx;
-                    node.y += event.dy;
-                });
-                updateGraph();
-            } else if (mode === 'link' && mousedownNode) {
-                let p = d3.pointer(event, zoomGroup.node());
-                dragLine.attr("d", `M${mousedownNode.x},${mousedownNode.y}L${p[0]},${p[1]}`);
-            }
-        }
+        // Control Point Drag (Edge Reshaping)
+        const cpDrag = d3.drag()
+            .on("start", function(e, d) { selectEl(d, 'link'); })
+            .on("drag", function(e, d) {
+                d.customCp = true;
+                d.cp.x += e.dx; d.cp.y += e.dy;
+                render();
+            });
 
-        function dragended(event, d) {
-            if (isSimulating) return;
-            
-            if (mode === 'select' && dragSnapshot) {
-                let oldNode = dragSnapshot.nodes.find(n => n.id === d.id);
-                if (oldNode && (oldNode.x !== d.x || oldNode.y !== d.y)) {
-                    redoStack = [];
-                    undoStack.push(dragSnapshot);
-                }
-            }
-
-            if (mode === 'link' && mousedownNode) {
-                dragLine.classed("hidden", true);
-                let p = d3.pointer(event, zoomGroup.node());
-                let targetNode = nodes.find(n => {
-                    let dx = n.x - p[0], dy = n.y - p[1];
-                    return (dx * dx + dy * dy) < (NODE_RADIUS * NODE_RADIUS * 3); 
-                });
-                
-                if (targetNode) {
-                    promptForTransition(mousedownNode, targetNode);
-                }
-                mousedownNode = null;
-            }
-            dragSnapshot = null;
+        // --- Graph Logic ---
+        function computeDefaultCP(s, t) {
+            if (s === t) return { x: s.x, y: s.y - 80 };
+            let dx = t.x - s.x, dy = t.y - s.y;
+            let len = Math.hypot(dx, dy) || 1;
+            let nx = -dy / len, ny = dx / len;
+            let offset = 30; 
+            return { x: (s.x + t.x)/2 + nx*offset, y: (s.y + t.y)/2 + ny*offset };
         }
 
         function addNode(x, y) {
-            let isFirst = nodes.length === 0;
-            let node = { id: "q" + nodeIdCounter, name: "q" + nodeIdCounter, isStart: isFirst, isFinal: false, x: x, y: y };
-            nodeIdCounter++;
-            nodes.push(node);
-            clearSelection();
-            selectedNodes.add(node);
-            updateGraph();
-            // Tools stay sticky, mode does not reset
+            let n = { id: `q${nId++}`, name: `q${nId-1}`, x, y, isStart: nodes.length === 0, isFinal: false };
+            nodes.push(n); selectEl(n, 'node'); render();
         }
 
-        let pendingLink = null;
-        const modal = document.getElementById('modal-transition');
-        const modalInput = document.getElementById('modal-input');
-
-        function promptForTransition(source, target) {
+        function promptEdge(source, target) {
             let existing = links.find(l => l.source === source && l.target === target);
-            if (existing) {
-                clearSelection();
-                selectedLinks.add(existing);
-                updateGraph();
+            if (existing) { selectEl(existing, 'link'); return; }
+            pendingEdge = { source, target };
+            document.getElementById('edge-modal').classList.remove('hidden');
+            let input = document.getElementById('edge-input');
+            input.value = ''; input.focus();
+            
+            input.onkeydown = (e) => { if (e.key === 'Enter') confirmEdge(); if(e.key === 'Escape') cancelEdge(); };
+        }
+
+        function cancelEdge() {
+            pendingEdge = null;
+            document.getElementById('edge-modal').classList.add('hidden');
+        }
+
+        function confirmEdge() {
+            if (!pendingEdge) return;
+            let raw = document.getElementById('edge-input').value;
+            if (!raw.trim()) {
+                showToast("Please enter at least one symbol.");
                 return;
             }
-            pendingLink = { source, target };
-            modalInput.value = '';
-            modal.classList.remove('hidden');
-            setTimeout(() => modalInput.focus(), 50);
-        }
+            let labels = raw.split(',').map(s => s.trim()).filter(s => s);
+            labels = labels.map(l => l.toLowerCase() === 'eps' ? EPSILON : l);
 
-        document.getElementById('modal-btn-cancel').addEventListener('click', () => {
-            modal.classList.add('hidden');
-            pendingLink = null;
-        });
-
-        document.getElementById('modal-btn-epsilon').addEventListener('click', () => {
-            modalInput.value = modalInput.value ? modalInput.value + ',' + EPSILON : EPSILON;
-            modalInput.focus();
-        });
-
-        document.getElementById('modal-btn-ok').addEventListener('click', finalizeTransition);
-        modalInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') finalizeTransition();
-            if (e.key === 'Escape') { modal.classList.add('hidden'); pendingLink = null; }
-        });
-
-        function finalizeTransition() {
-            if (!pendingLink) return;
-            let val = modalInput.value.replace(/\s+/g, '');
-            if (!val) { showMessage("Enter at least one symbol.", "error"); return; }
-            
-            saveState(); 
-
-            let link = { source: pendingLink.source, target: pendingLink.target, label: val };
-            links.push(link);
-            modal.classList.add('hidden');
-            pendingLink = null;
-            
-            clearSelection();
-            selectedLinks.add(link);
-            updateGraph();
-        }
-
-        function clearSelection() {
-            selectedNodes.clear();
-            selectedLinks.clear();
+            let l = { id: `l${lId++}`, source: pendingEdge.source, target: pendingEdge.target, labels, cp: computeDefaultCP(pendingEdge.source, pendingEdge.target), customCp: false };
+            links.push(l);
+            selectEl(l, 'link'); render();
+            cancelEdge();
         }
 
         function deleteSelected() {
-            if (isSimulating || (selectedNodes.size === 0 && selectedLinks.size === 0)) return;
-            
-            saveState(); 
-            let elementsDeleted = 0;
-            
-            if (selectedNodes.size > 0) {
-                links = links.filter(l => !selectedNodes.has(l.source) && !selectedNodes.has(l.target));
-                nodes = nodes.filter(n => !selectedNodes.has(n));
-                if (!nodes.some(n => n.isStart) && nodes.length > 0) nodes[0].isStart = true;
-                elementsDeleted += selectedNodes.size;
-                selectedNodes.clear();
+            if (!selectedEl) return;
+            if (selectedType === 'node') {
+                links = links.filter(l => l.source !== selectedEl && l.target !== selectedEl);
+                nodes = nodes.filter(n => n !== selectedEl);
+                if(nodes.length > 0 && !nodes.some(n=>n.isStart)) nodes[0].isStart = true;
+            } else if (selectedType === 'link') {
+                links = links.filter(l => l !== selectedEl);
             }
-            
-            if (selectedLinks.size > 0) {
-                links = links.filter(l => !selectedLinks.has(l));
-                elementsDeleted += selectedLinks.size;
-                selectedLinks.clear();
-            }
-
-            if (elementsDeleted > 0) {
-                updateGraph();
-                showMessage(`${elementsDeleted} element(s) deleted.`);
-            }
+            clearSelection(); render();
         }
 
-        document.addEventListener('keydown', (e) => {
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-            if (!modal.classList.contains('hidden')) return;
+        // --- Render Engine ---
+        function render() {
+            // Update Empty State Hint visibility
+            emptyHint.style.opacity = nodes.length === 0 ? '1' : '0';
+            emptyHint.style.pointerEvents = 'none';
+
+            // Links Layer
+            let linkSel = linksLayer.selectAll("g.link-group").data(links, d => d.id);
+            linkSel.exit().remove();
             
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-                e.preventDefault();
-                undo();
-            }
-            if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') || ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z')) {
-                e.preventDefault();
-                redo();
-            }
+            let linkEnter = linkSel.enter().append("g").attr("class", "link-group")
+                .on("click", (e, d) => { e.stopPropagation(); selectEl(d, 'link'); });
 
-            if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
-        });
+            linkEnter.append("path").attr("class", "link-path");
+            linkEnter.append("circle").attr("class", "control-point").attr("r", 4.5).call(cpDrag);
+            let lblG = linkEnter.append("g").attr("class", "label-group");
+            lblG.append("rect").attr("class", "link-label-bg");
+            lblG.append("text").attr("class", "link-label");
 
-        function setMode(newMode) {
-            if (isSimulating) return;
-            mode = newMode;
-            
-            const activeClasses = ['bg-blue-50', 'dark:bg-blue-500/10', 'text-blue-700', 'dark:text-blue-400', 'border-blue-200', 'dark:border-blue-500/30'];
-            const inactiveClasses = ['bg-white', 'dark:bg-slate-800', 'border-slate-200', 'dark:border-slate-700', 'hover:bg-slate-50', 'dark:hover:bg-slate-700'];
+            let allLinks = linkEnter.merge(linkSel);
 
-            document.querySelectorAll('button[id^="btn-mode-"]').forEach(btn => {
-                btn.classList.remove(...activeClasses);
-                btn.classList.add(...inactiveClasses);
-            });
-            let activeBtn = document.getElementById(`btn-mode-${mode}`);
-            activeBtn.classList.remove(...inactiveClasses);
-            activeBtn.classList.add(...activeClasses);
-
-            let hint = "";
-            if (mode === 'select') hint = "Drag to select multiple. Use Del to delete. Ctrl+Z to Undo.";
-            else if (mode === 'pan') hint = "Drag to move the canvas. Use mouse wheel to zoom.";
-            else if (mode === 'node') hint = "Click on the workspace to create a new state.";
-            else if (mode === 'link') hint = "Drag from one state to another to create a transition.";
-            document.getElementById('mode-hint').innerText = hint;
-            
-            if (mode === 'pan') svg.style("cursor", "grab");
-            else if (mode === 'node') svg.style("cursor", "crosshair");
-            else svg.style("cursor", "default");
-        }
-
-        document.getElementById('btn-mode-select').addEventListener('click', () => setMode('select'));
-        document.getElementById('btn-mode-pan').addEventListener('click', () => setMode('pan'));
-        document.getElementById('btn-mode-node').addEventListener('click', () => setMode('node'));
-        document.getElementById('btn-mode-link').addEventListener('click', () => setMode('link'));
-
-        function updateSidebar() {
-            let totalSelected = selectedNodes.size + selectedLinks.size;
-            
-            document.getElementById('panel-empty').classList.add('hidden');
-            document.getElementById('panel-multi').classList.add('hidden');
-            document.getElementById('panel-node').classList.add('hidden');
-            document.getElementById('panel-link').classList.add('hidden');
-
-            if (totalSelected === 0) {
-                document.getElementById('panel-empty').classList.remove('hidden');
-            } else if (totalSelected > 1) {
-                document.getElementById('panel-multi').classList.remove('hidden');
-                document.getElementById('multi-count').innerText = `${totalSelected} elements selected`;
-            } else if (selectedNodes.size === 1) {
-                document.getElementById('panel-node').classList.remove('hidden');
-                let node = Array.from(selectedNodes)[0];
-                document.getElementById('prop-node-name').value = node.name;
-                document.getElementById('prop-node-start').checked = node.isStart;
-                document.getElementById('prop-node-final').checked = node.isFinal;
-            } else if (selectedLinks.size === 1) {
-                document.getElementById('panel-link').classList.remove('hidden');
-                let link = Array.from(selectedLinks)[0];
-                document.getElementById('prop-link-label').value = link.label;
-            }
-        }
-
-        document.getElementById('prop-node-name').addEventListener('change', (e) => {
-            if (selectedNodes.size === 1) { saveState(); Array.from(selectedNodes)[0].name = e.target.value; updateGraph(); }
-        });
-        document.getElementById('prop-node-start').addEventListener('change', (e) => {
-            if (selectedNodes.size === 1) {
-                saveState();
-                let node = Array.from(selectedNodes)[0];
-                if (e.target.checked) {
-                    nodes.forEach(n => n.isStart = false); 
-                    node.isStart = true;
-                    updateGraph();
-                } else if (!e.target.checked) {
-                    e.target.checked = true; 
-                    showMessage("An initial state must exist.", "error");
-                }
-            }
-        });
-        document.getElementById('prop-node-final').addEventListener('change', (e) => {
-            if (selectedNodes.size === 1) { saveState(); Array.from(selectedNodes)[0].isFinal = e.target.checked; updateGraph(); }
-        });
-
-        document.getElementById('prop-link-label').addEventListener('change', (e) => {
-            if (selectedLinks.size === 1) { 
-                saveState();
-                let val = e.target.value.replace(/\s+/g, '');
-                Array.from(selectedLinks)[0].label = val; 
-                updateGraph(); 
-            }
-        });
-        document.getElementById('btn-add-epsilon-panel').addEventListener('click', () => {
-            if (selectedLinks.size === 1) {
-                saveState();
-                let link = Array.from(selectedLinks)[0];
-                let input = document.getElementById('prop-link-label');
-                let val = input.value;
-                val = val ? val + "," + EPSILON : EPSILON;
-                link.label = val; input.value = val;
-                updateGraph();
-            }
-        });
-        
-        document.getElementById('btn-delete-node').addEventListener('click', deleteSelected);
-        document.getElementById('btn-delete-link').addEventListener('click', deleteSelected);
-        document.getElementById('btn-delete-multi').addEventListener('click', deleteSelected);
-
-        function showMessage(msg, type="info") {
-            const box = document.getElementById('message-box');
-            box.innerText = msg;
-            box.className = type === 'error' 
-                ? "px-4 py-1.5 rounded-lg text-white font-medium text-sm transition-opacity duration-300 bg-rose-500 shadow-md opacity-100"
-                : "px-4 py-1.5 rounded-lg text-white font-medium text-sm transition-opacity duration-300 bg-blue-500 shadow-md opacity-100";
-            if(type === "success") {
-                 box.className = "px-4 py-1.5 rounded-lg text-white font-medium text-sm transition-opacity duration-300 bg-emerald-500 shadow-md opacity-100";
-            }
-            setTimeout(() => { box.classList.remove('opacity-100'); box.classList.add('opacity-0'); }, 2500);
-        }
-
-        // --- Simulazione ---
-        function getStartNode() { return nodes.find(n => n.isStart); }
-        function eClosure(stateIds) {
-            let closure = new Set(stateIds);
-            let stack = Array.from(stateIds);
-            while(stack.length > 0) {
-                let currentId = stack.pop();
-                let outgoingLinks = links.filter(l => l.source.id === currentId);
-                for(let link of outgoingLinks) {
-                    if (link.label.split(',').map(s => s.trim()).includes(EPSILON)) {
-                        if (!closure.has(link.target.id)) { closure.add(link.target.id); stack.push(link.target.id); }
+            allLinks.classed("selected", d => selectedEl === d);
+            allLinks.select("path.link-path")
+                .attr("marker-end", d => selectedEl === d ? "url(#arrow-selected)" : "url(#arrow)")
+                .attr("d", d => {
+                    if (d.source === d.target) {
+                        let h = Math.abs(d.source.y - d.cp.y) || 50;
+                        let w = 40; // width of self loop curve
+                        return `M ${d.source.x - 10},${d.source.y - NODE_R + 2} C ${d.source.x - w},${d.source.y - h} ${d.source.x + w},${d.source.y - h} ${d.source.x + 10},${d.source.y - NODE_R + 2}`;
+                    } else {
+                        return `M ${d.source.x},${d.source.y} Q ${d.cp.x},${d.cp.y} ${d.target.x},${d.target.y}`;
                     }
+                });
+
+            allLinks.select("circle.control-point")
+                .attr("cx", d => d.cp.x).attr("cy", d => d.cp.y);
+
+            allLinks.each(function(d) {
+                let lbl = d.labels.join(', ');
+                let textEl = d3.select(this).select("text").text(lbl);
+                let bbox = textEl.node().getBBox();
+                
+                let px = d.cp.x, py = d.cp.y;
+                if(d.source === d.target) {
+                    let h = Math.abs(d.source.y - d.cp.y) || 50;
+                    py = d.source.y - h - 15; 
+                } else {
+                    py -= 15; // float above CP
                 }
+
+                d3.select(this).select("rect")
+                    .attr("x", px - bbox.width/2 - 6).attr("y", py - bbox.height/2 - 4)
+                    .attr("width", bbox.width + 12).attr("height", bbox.height + 8);
+                
+                textEl.attr("x", px).attr("y", py);
+            });
+
+            // Nodes Layer
+            let nodeSel = nodesLayer.selectAll("g.node").data(nodes, d => d.id);
+            nodeSel.exit().remove();
+
+            let nodeEnter = nodeSel.enter().append("g").attr("class", "node")
+                .call(nodeDrag)
+                .on("click", (e, d) => { e.stopPropagation(); selectEl(d, 'node'); });
+
+            nodeEnter.append("path").attr("class", "start-arrow")
+                .attr("d", `M ${-NODE_R - 25} 0 L ${-NODE_R} 0 M ${-NODE_R - 8} -6 L ${-NODE_R} 0 L ${-NODE_R - 8} 6`);
+            nodeEnter.append("circle").attr("class", "bg").attr("r", NODE_R);
+            nodeEnter.append("circle").attr("class", "inner hidden").attr("r", NODE_R - 4);
+            nodeEnter.append("text");
+
+            let allNodes = nodeEnter.merge(nodeSel);
+            
+            allNodes.attr("transform", d => `translate(${d.x},${d.y})`)
+                .classed("selected", d => selectedEl === d)
+                .classed("active", d => d.simActive)
+                .classed("final", d => d.isFinal);
+            
+            allNodes.select(".start-arrow").style("display", d => d.isStart ? "block" : "none");
+            allNodes.select(".inner").classed("hidden", d => !d.isFinal);
+            allNodes.select("text").text(d => d.name);
+        }
+
+        // --- Inspector Panel ---
+        const panel = document.getElementById('inspector-panel');
+        
+        function selectEl(el, type) {
+            selectedEl = el; selectedType = type;
+            render(); buildInspector();
+            panel.classList.remove('opacity-0', 'pointer-events-none', 'translate-x-4');
+        }
+
+        function clearSelection() {
+            selectedEl = null; selectedType = null; render();
+            panel.classList.add('opacity-0', 'pointer-events-none', 'translate-x-4');
+        }
+
+        function buildInspector() {
+            const content = document.getElementById('inspector-content');
+            const title = document.getElementById('inspector-title');
+            
+            if (selectedType === 'node') {
+                title.innerText = 'State Properties';
+                content.innerHTML = `
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">State Name</label>
+                        <input type="text" value="${selectedEl.name}" onchange="if(selectedEl){selectedEl.name=this.value;render();}" class="w-full bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-apple-blue font-medium">
+                    </div>
+                    <div class="flex flex-col gap-3 mt-2">
+                        <label class="flex items-center justify-between cursor-pointer group">
+                            <span class="text-sm font-medium">Initial State</span>
+                            <div class="relative w-11 h-6 rounded-full transition-colors ${selectedEl.isStart ? 'bg-apple-green' : 'bg-slate-300 dark:bg-slate-600'}">
+                                <input type="checkbox" ${selectedEl.isStart ? 'checked' : ''} onchange="toggleProp('isStart', this.checked)" class="sr-only">
+                                <div class="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform transform shadow-sm ${selectedEl.isStart ? 'translate-x-5' : ''}"></div>
+                            </div>
+                        </label>
+                        <label class="flex items-center justify-between cursor-pointer group">
+                            <span class="text-sm font-medium">Final State</span>
+                            <div class="relative w-11 h-6 rounded-full transition-colors ${selectedEl.isFinal ? 'bg-apple-green' : 'bg-slate-300 dark:bg-slate-600'}">
+                                <input type="checkbox" ${selectedEl.isFinal ? 'checked' : ''} onchange="toggleProp('isFinal', this.checked)" class="sr-only">
+                                <div class="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform transform shadow-sm ${selectedEl.isFinal ? 'translate-x-5' : ''}"></div>
+                            </div>
+                        </label>
+                    </div>
+                    <button onclick="deleteSelected()" class="mt-4 w-full bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold py-2.5 rounded-xl text-xs transition-all hover:bg-rose-500/20 active:scale-95 border border-rose-500/20">Delete State</button>
+                `;
+            } else if (selectedType === 'link') {
+                title.innerText = 'Transition Properties';
+                let tags = selectedEl.labels.map((l, i) => `
+                    <span class="bg-apple-blue/10 border border-apple-blue/20 text-apple-blue px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                        ${l} <button onclick="removeLabel(${i})" class="hover:text-rose-500 rounded-full bg-apple-blue/10 w-4 h-4 flex items-center justify-center">&times;</button>
+                    </span>
+                `).join('');
+                
+                content.innerHTML = `
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-2">Symbols</label>
+                        <div class="flex flex-wrap gap-2 mb-3">${tags}</div>
+                        <div class="flex gap-2">
+                            <input type="text" id="prop-new-lbl" placeholder="Sym" onkeydown="if(event.key==='Enter') addLabel()" class="flex-1 bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-apple-blue font-mono font-medium">
+                            <button onclick="addLabel()" class="bg-slate-200 dark:bg-slate-700 px-3 py-2 rounded-xl text-sm font-bold hover:bg-slate-300 transition-colors shadow-sm">+</button>
+                            <button onclick="addEpsilon()" class="bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 px-3 py-2 rounded-xl text-sm font-bold transition-colors shadow-sm">ε</button>
+                        </div>
+                    </div>
+                    <button onclick="deleteSelected()" class="mt-4 w-full bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold py-2.5 rounded-xl text-xs transition-all hover:bg-rose-500/20 active:scale-95 border border-rose-500/20">Delete Transition</button>
+                `;
+            }
+        }
+
+        window.toggleProp = (prop, val) => {
+            if(prop === 'isStart' && val) nodes.forEach(n=>n.isStart=false);
+            if(selectedEl) selectedEl[prop] = val;
+            render(); buildInspector();
+        };
+        window.removeLabel = (i) => { if(selectedEl){ selectedEl.labels.splice(i,1); if(!selectedEl.labels.length) selectedEl.labels.push(EPSILON); render(); buildInspector(); }};
+        window.addLabel = () => { let v = document.getElementById('prop-new-lbl').value.trim(); if(v && selectedEl && !selectedEl.labels.includes(v)){ selectedEl.labels.push(v); render(); buildInspector(); }};
+        window.addEpsilon = () => { if(selectedEl && !selectedEl.labels.includes(EPSILON)){ selectedEl.labels.push(EPSILON); render(); buildInspector(); }};
+
+        // --- Tabs ---
+        function switchTab(tab) {
+            ['sim', 'batch', 'regex', 'tools'].forEach(t => {
+                document.getElementById(`view-${t}`).classList.toggle('hidden', t !== tab);
+                let btn = document.getElementById(`tab-${t}`);
+                if(t === tab) btn.className = "flex-1 text-[11px] font-semibold py-1.5 rounded-lg bg-white dark:bg-slate-700 shadow-sm transition-all text-slate-800 dark:text-slate-200";
+                else btn.className = "flex-1 text-[11px] font-semibold py-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all";
+            });
+        }
+
+        // --- Simulation Log Elements ---
+        const tlCont = document.getElementById('sim-timeline');
+        function addLog(title, desc, type='info') {
+            let color = 'bg-apple-blue';
+            if(type === 'success') color = 'bg-apple-green';
+            if(type === 'error') color = 'bg-rose-500';
+            
+            let html = `
+            <div class="timeline-item relative pl-6 pb-3 fade-in">
+                <div class="timeline-line"></div>
+                <div class="absolute w-3 h-3 ${color} rounded-full -left-[5px] top-[4px] shadow-sm ring-4 ring-white dark:ring-[#1a1a1a] z-10"></div>
+                <div class="text-sm font-bold text-slate-800 dark:text-slate-200">${title}</div>
+                ${desc ? `<div class="text-[11px] text-slate-500 font-mono mt-0.5">${desc}</div>` : ''}
+            </div>`;
+            tlCont.innerHTML += html;
+            tlCont.parentElement.scrollTop = tlCont.parentElement.scrollHeight;
+        }
+
+        // --- Simulation Logic ---
+        let simState = { active: new Set(), str: "", idx: 0, running: false };
+
+        function getEClosure(states) {
+            let closure = new Set(states);
+            let stack = Array.from(states);
+            while(stack.length) {
+                let curr = stack.pop();
+                links.filter(l => l.source.id === curr && l.labels.includes(EPSILON)).forEach(l => {
+                    if(!closure.has(l.target.id)) { closure.add(l.target.id); stack.push(l.target.id); }
+                });
             }
             return closure;
         }
-        function move(stateIds, symbol) {
-            let nextStates = new Set();
-            for(let id of stateIds) {
-                let outgoingLinks = links.filter(l => l.source.id === id);
-                for(let link of outgoingLinks) {
-                    if (link.label.split(',').map(s => s.trim()).includes(symbol)) nextStates.add(link.target.id);
+
+        function getMove(states, char) {
+            let next = new Set();
+            for(let id of states) {
+                links.filter(l => l.source.id === id && l.labels.includes(char)).forEach(l => next.add(l.target.id));
+            }
+            return getEClosure(next);
+        }
+
+        function updateVisuals() {
+            nodes.forEach(n => n.simActive = simState.active.has(n.id));
+            render();
+        }
+
+        function runEval(inputStr) {
+            let start = nodes.find(n => n.isStart);
+            if(!start) return { err: "No start state" };
+            let current = getEClosure(new Set([start.id]));
+            for(let char of inputStr) {
+                current = getMove(current, char);
+                if(current.size === 0) return { accepted: false };
+            }
+            return { accepted: Array.from(current).some(id => nodes.find(n=>n.id===id).isFinal) };
+        }
+
+        window.quickSimulation = () => {
+            if(!nodes.length) return showToast("Graph is empty");
+            let str = document.getElementById('sim-input').value;
+            tlCont.innerHTML = '';
+            let res = runEval(str);
+            if(res.err) return addLog("Error", res.err, "error");
+            
+            addLog(`Quick Run: "${str}"`, `Completed computation.`, "info");
+            if(res.accepted) addLog("Result: ACCEPTED", "", "success");
+            else addLog("Result: REJECTED", "", "error");
+            
+            simState.active = getEClosure(new Set([nodes.find(n=>n.isStart).id]));
+            for(let c of str) simState.active = getMove(simState.active, c);
+            updateVisuals(); setTimeout(() => { simState.active.clear(); updateVisuals(); }, 1500);
+        };
+
+        window.startStepSimulation = () => {
+            if(!nodes.length) return showToast("Graph is empty");
+            let startNode = nodes.find(n => n.isStart);
+            if(!startNode) return showToast("No start state");
+
+            simState.str = document.getElementById('sim-input').value;
+            simState.idx = 0;
+            simState.running = true;
+            
+            document.getElementById('sim-start-controls').classList.add('hidden');
+            document.getElementById('step-controls').classList.remove('hidden');
+            
+            tlCont.innerHTML = ''; 
+            simState.active = getEClosure(new Set([startNode.id]));
+            
+            let names = Array.from(simState.active).map(id => nodes.find(n=>n.id===id).name).join(', ');
+            addLog("Simulation Started", `Initial States: {${names}}`, "info");
+            updateVisuals();
+            
+            if(simState.str.length === 0) finishSim();
+        };
+
+        window.nextStep = () => {
+            if(!simState.running) return;
+            let char = simState.str[simState.idx];
+            let nextStates = getMove(simState.active, char);
+            
+            let names = Array.from(nextStates).map(id => nodes.find(n=>n.id===id).name).join(', ') || 'Ø';
+            addLog(`Read '${char}'`, `Active: {${names}}`, nextStates.size ? "info" : "error");
+            
+            simState.active = nextStates;
+            simState.idx++;
+            updateVisuals();
+            
+            if(simState.active.size === 0) {
+                addLog("Rejected", "Machine is in a dead state.", "error");
+                stopSimulation(true);
+            } else if (simState.idx >= simState.str.length) {
+                finishSim();
+            }
+        };
+
+        function finishSim() {
+            let isAccepted = Array.from(simState.active).some(id => nodes.find(n=>n.id===id).isFinal);
+            if(isAccepted) addLog("Accepted", "String fully consumed in Final state.", "success");
+            else addLog("Rejected", "String consumed but not in Final state.", "error");
+            stopSimulation(true);
+        }
+
+        window.stopSimulation = (keepLogs=false) => {
+            simState.running = false;
+            simState.active.clear();
+            updateVisuals();
+            document.getElementById('sim-start-controls').classList.remove('hidden');
+            document.getElementById('step-controls').classList.add('hidden');
+            if(!keepLogs) {
+                tlCont.innerHTML = '<div class="text-xs text-slate-400 italic text-center mt-4">Simulation stopped.</div>';
+            }
+        };
+
+        // --- Batch Logic ---
+        window.runBatch = () => {
+            if(nodes.length === 0) return showToast("Graph empty");
+            let lines = document.getElementById('batch-input').value.split('\n').map(l=>l.trim()).filter(l=>l!=='');
+            if(lines.length === 0) lines = [""];
+            const list = document.getElementById('batch-results');
+            list.innerHTML = '';
+            
+            lines.forEach(str => {
+                let res = runEval(str);
+                let li = document.createElement('li');
+                li.className = "flex justify-between items-center p-3 text-sm font-mono border-slate-200/50 dark:border-slate-700/50";
+                
+                let sDisp = str === "" ? "ε" : str;
+                if(res.err) li.innerHTML = `<span>${sDisp}</span><span class="text-amber-500 font-bold">ERR</span>`;
+                else if(res.accepted) li.innerHTML = `<span>${sDisp}</span><span class="text-emerald-500 font-bold">ACC</span>`;
+                else li.innerHTML = `<span>${sDisp}</span><span class="text-rose-500 font-bold">REJ</span>`;
+                list.appendChild(li);
+            });
+        };
+
+        // --- Automata Tools ---
+        window.convertNfaToDfa = () => {
+            let start = nodes.find(n=>n.isStart);
+            if(!start) return showToast("Need a start state");
+            
+            let alpha = new Set();
+            links.forEach(l => l.labels.forEach(sym => { if(sym !== EPSILON) alpha.add(sym); }));
+            alpha = Array.from(alpha);
+
+            let dfaNodes = [], dfaLinks = [];
+            let stateMap = new Map();
+            let queue = [];
+            
+            let initClosure = Array.from(getEClosure(new Set([start.id]))).sort();
+            let initKey = initClosure.join(',');
+            
+            let cId = 0;
+            let dStart = { id: `Q${cId}`, name: `Q${cId}`, isStart: true, isFinal: initClosure.some(id => nodes.find(n=>n.id===id).isFinal), x: window.innerWidth/2 - 100, y: window.innerHeight/2 };
+            dfaNodes.push(dStart); stateMap.set(initKey, dStart); queue.push(initClosure); cId++;
+            
+            while(queue.length > 0) {
+                let currSet = queue.shift();
+                let srcNode = stateMap.get(currSet.join(','));
+                
+                for(let sym of alpha) {
+                    let nextSet = Array.from(getMove(currSet, sym)).sort();
+                    if(nextSet.length === 0) continue;
+                    
+                    let nextKey = nextSet.join(',');
+                    let destNode;
+                    if(!stateMap.has(nextKey)) {
+                        destNode = { id: `Q${cId}`, name: `Q${cId}`, isStart: false, isFinal: nextSet.some(id => nodes.find(n=>n.id===id).isFinal), x: window.innerWidth/2 + (cId*60), y: window.innerHeight/2 + ((cId%2===0?1:-1)*60) };
+                        dfaNodes.push(destNode); stateMap.set(nextKey, destNode); queue.push(nextSet); cId++;
+                    } else { destNode = stateMap.get(nextKey); }
+                    
+                    let link = dfaLinks.find(l => l.source.id === srcNode.id && l.target.id === destNode.id);
+                    if(link) { if(!link.labels.includes(sym)) link.labels.push(sym); } 
+                    else dfaLinks.push({ id: `L${dfaLinks.length}`, source: srcNode, target: destNode, labels: [sym], cp: computeDefaultCP(srcNode, destNode), customCp: false });
                 }
             }
-            return nextStates;
-        }
-        function appendSimLog(text, type="normal") {
-            const logDiv = document.getElementById('sim-status');
-            const p = document.createElement('div');
             
-            let colorClass = "text-slate-300";
-            let prefix = `<span class="text-emerald-400 mr-2 select-none">$</span>`;
-            
-            if (type === 'success') {
-                colorClass = "text-emerald-400 font-bold bg-emerald-500/10 p-2 rounded mt-2 border border-emerald-500/20";
-                prefix = `<span class="text-emerald-500 mr-2 select-none">✔</span>`;
-            } else if (type === 'error') {
-                colorClass = "text-rose-400 font-bold bg-rose-500/10 p-2 rounded mt-2 border border-rose-500/20";
-                prefix = `<span class="text-rose-500 mr-2 select-none">✖</span>`;
-            } else if (type === 'info') {
-                colorClass = "text-sky-400 font-semibold mb-1";
-                prefix = `<span class="text-sky-500 mr-2 select-none">#</span>`;
+            nodes = dfaNodes; links = dfaLinks;
+            nId = cId; lId = dfaLinks.length;
+            clearSelection(); autoLayout(); showToast("Converted to DFA");
+        };
+
+        // --- Minimize DFA (Hopcroft's Algorithm) ---
+        window.minimizeDfa = () => {
+            if (!nodes.length) return showToast("Graph is empty");
+            let start = nodes.find(n => n.isStart);
+            if (!start) return showToast("Need a start state");
+
+            // 1. Remove unreachable states first
+            let reachable = new Set([start.id]);
+            let queue = [start.id];
+            while (queue.length > 0) {
+                let curr = queue.shift();
+                links.filter(l => l.source.id === curr).forEach(l => {
+                    if (!reachable.has(l.target.id)) {
+                        reachable.add(l.target.id);
+                        queue.push(l.target.id);
+                    }
+                });
             }
-            
-            p.className = `mb-1.5 leading-relaxed flex items-start ${colorClass}`;
-            p.innerHTML = `${prefix}<div class="flex-1">${text}</div>`;
-            
-            logDiv.appendChild(p);
-            logDiv.scrollTop = logDiv.scrollHeight; 
-        }
-        function clearSimLog() { document.getElementById('sim-status').innerHTML = ''; }
-        function checkAcceptance() {
-            for(let id of activeStates) {
-                let n = nodes.find(x => x.id === id);
-                if (n && n.isFinal) return true;
+            nodes = nodes.filter(n => reachable.has(n.id));
+            links = links.filter(l => reachable.has(l.source.id) && reachable.has(l.target.id));
+
+            // Extract alphabet
+            let alpha = new Set();
+            links.forEach(l => l.labels.forEach(sym => { if (sym !== EPSILON) alpha.add(sym); }));
+            alpha = Array.from(alpha);
+
+            // 2. Initial Partitions (Final and Non-Final states)
+            let finalStates = nodes.filter(n => n.isFinal).map(n => n.id);
+            let nonFinalStates = nodes.filter(n => !n.isFinal).map(n => n.id);
+            let P = [];
+            if (finalStates.length > 0) P.push(finalStates);
+            if (nonFinalStates.length > 0) P.push(nonFinalStates);
+
+            let W = [...P];
+
+            // 3. Iteratively refine partitions
+            while (W.length > 0) {
+                let A = W.shift();
+                for (let c of alpha) {
+                    // X = States that transition into A on symbol 'c'
+                    let X = new Set();
+                    links.forEach(l => {
+                        if (l.labels.includes(c) && A.includes(l.target.id)) {
+                            X.add(l.source.id);
+                        }
+                    });
+
+                    for (let i = 0; i < P.length; i++) {
+                        let Y = P[i];
+                        let intersection = Y.filter(id => X.has(id));
+                        let difference = Y.filter(id => !X.has(id));
+
+                        if (intersection.length > 0 && difference.length > 0) {
+                            P.splice(i, 1);
+                            P.push(intersection, difference);
+
+                            let wIndex = W.findIndex(w => w === Y);
+                            if (wIndex !== -1) {
+                                W.splice(wIndex, 1);
+                                W.push(intersection, difference);
+                            } else {
+                                if (intersection.length <= difference.length) W.push(intersection);
+                                else W.push(difference);
+                            }
+                            i--; // Re-evaluate index since P shrunk
+                        }
+                    }
+                }
             }
-            return false;
-        }
-        function validateInputAlphabet(inputStr) {
-            let alphaStr = document.getElementById('sim-alphabet').value.replace(/\s+/g, '');
-            if (!alphaStr) return true; 
-            let alphabet = alphaStr.split(',');
-            for (let char of inputStr) {
-                if (!alphabet.includes(char)) { showMessage(`Symbol '${char}' is not in the alphabet.`, "error"); return false; }
+
+            // 4. Rebuild graph from partitions
+            let minNodes = [];
+            let minLinks = [];
+            let partMap = new Map();
+
+            P.forEach((part, idx) => {
+                let isStart = part.some(id => nodes.find(n => n.id === id).isStart);
+                let isFinal = part.some(id => nodes.find(n => n.id === id).isFinal);
+                // Name state after the first element or combine them
+                let originalNodes = part.map(id => nodes.find(n => n.id === id));
+                let name = originalNodes.map(n => n.name).join(',');
+                if (name.length > 10) name = `P${idx}`; // fallback for very long names
+
+                let n = {
+                    id: `qm${idx}`, name: name, isStart, isFinal,
+                    x: window.innerWidth / 2 + (Math.random() - 0.5) * 150,
+                    y: window.innerHeight / 2 + (Math.random() - 0.5) * 150
+                };
+                minNodes.push(n);
+                part.forEach(id => partMap.set(id, n));
+            });
+
+            links.forEach(l => {
+                let s = partMap.get(l.source.id);
+                let t = partMap.get(l.target.id);
+                if (!s || !t) return;
+
+                let existing = minLinks.find(ml => ml.source === s && ml.target === t);
+                l.labels.forEach(sym => {
+                    if (existing) {
+                        if (!existing.labels.includes(sym)) existing.labels.push(sym);
+                    } else {
+                        minLinks.push({
+                            id: `lm${minLinks.length}`, source: s, target: t, labels: [sym],
+                            cp: computeDefaultCP(s, t), customCp: false
+                        });
+                    }
+                });
+            });
+
+            nodes = minNodes; links = minLinks;
+            nId = minNodes.length; lId = minLinks.length;
+            clearSelection(); autoLayout(); showToast("DFA Minimized");
+        };
+
+        // --- Auto Layout ---
+        window.autoLayout = () => {
+            if(!nodes.length) return;
+            let sim = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).id(d=>d.id).distance(150))
+                .force("charge", d3.forceManyBody().strength(-1000))
+                .force("center", d3.forceCenter(window.innerWidth/2, window.innerHeight/2))
+                .stop();
+            for (let i = 0; i < 200; ++i) sim.tick();
+            
+            links.forEach(l => { if(!l.customCp) l.cp = computeDefaultCP(l.source, l.target); });
+            render();
+        };
+
+        window.clearCanvas = () => { nodes = []; links = []; nId=0; lId=0; clearSelection(); render(); };
+        window.toggleTheme = () => {
+            document.documentElement.classList.toggle('dark');
+            document.getElementById('theme-icon').className = document.documentElement.classList.contains('dark') ? 'ph ph-sun text-lg' : 'ph ph-moon text-lg';
+        };
+
+        // --- Export/Import Utilities (File System API + Quality Upgrades) ---
+        async function saveFile(blob, defaultName, extension, description, mimeType) {
+            try {
+                if (window.showSaveFilePicker) {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: defaultName + extension,
+                        types: [{ description, accept: { [mimeType]: [extension] } }]
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    showToast("File saved successfully.");
+                } else {
+                    // Fallback for browsers that don't support showSaveFilePicker
+                    let name = prompt(`Enter file name to save as ${extension}:`, defaultName);
+                    if (!name) return; // User cancelled
+                    if (!name.endsWith(extension)) name += extension;
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = name; a.click();
+                    URL.revokeObjectURL(url);
+                    showToast("File downloaded.");
+                }
+            } catch (err) {
+                if (err.name !== 'AbortError') showToast("Save failed.");
             }
-            return true;
         }
 
-        document.getElementById('btn-sim-quick').addEventListener('click', () => {
-            if(nodes.length === 0) return showMessage("The automaton is empty.", "error");
-            let startNode = getStartNode();
-            if (!startNode) return showMessage("Missing start state.", "error");
-            let inputStr = document.getElementById('sim-input').value;
-            if (!validateInputAlphabet(inputStr)) return;
+        window.exportJSON = () => {
+            let data = {
+                nodes: nodes.map(n => ({ id: n.id, name: n.name, x: n.x, y: n.y, isStart: n.isStart, isFinal: n.isFinal })),
+                links: links.map(l => ({ source: l.source.id, target: l.target.id, labels: l.labels, cp: l.cp, customCp: l.customCp }))
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+            saveFile(blob, 'autolab_graph', '.json', 'JSON File', 'application/json');
+        };
 
-            clearSimLog();
-            appendSimLog(`Quick test: <b>"${inputStr || 'ε'}"</b>`, "info");
-            activeStates = eClosure(new Set([startNode.id]));
-            
-            for(let i = 0; i < inputStr.length; i++) {
-                let next = move(activeStates, inputStr[i]);
-                activeStates = eClosure(next);
-                if (activeStates.size === 0) break; 
-            }
-            updateGraph();
-            if (checkAcceptance()) appendSimLog("Result: String ACCEPTED.", "success");
-            else appendSimLog("Result: String REJECTED.", "error");
-            
-            setTimeout(() => { if(!isSimulating) { activeStates.clear(); updateGraph(); } }, 2500);
+        document.getElementById('import-json').addEventListener('change', e => {
+            const file = e.target.files[0]; if(!file) return;
+            const reader = new FileReader();
+            reader.onload = ev => {
+                try {
+                    let d = JSON.parse(ev.target.result);
+                    nodes = d.nodes || [];
+                    links = (d.links || []).map((l, i) => ({
+                        id: `l${i}`, source: nodes.find(n=>n.id===l.source), target: nodes.find(n=>n.id===l.target),
+                        labels: l.labels, cp: l.cp || computeDefaultCP(nodes.find(n=>n.id===l.source), nodes.find(n=>n.id===l.target)), customCp: l.customCp || false
+                    }));
+                    nId = nodes.length ? Math.max(...nodes.map(n=>parseInt(n.id.replace(/\D/g, ''))||0)) + 1 : 0;
+                    lId = links.length;
+                    clearSelection(); render();
+                } catch(err) { showToast("Invalid JSON file"); }
+            };
+            reader.readAsText(file); e.target.value = '';
         });
 
-        document.getElementById('btn-sim-start-step').addEventListener('click', () => {
-            if(nodes.length === 0) return showMessage("The automaton is empty.", "error");
-            let startNode = getStartNode();
-            if (!startNode) return showMessage("Missing start state.", "error");
-            let inputStr = document.getElementById('sim-input').value;
-            if (!validateInputAlphabet(inputStr)) return;
-
-            isSimulating = true;
-            simString = inputStr; simIndex = 0;
-            clearSelection(); setMode('select'); 
-
-            document.getElementById('btn-sim-start-step').classList.add('hidden');
-            document.getElementById('btn-sim-quick').classList.add('hidden');
-            document.getElementById('btn-sim-stop').classList.remove('hidden');
-            document.getElementById('btn-sim-next').classList.remove('hidden');
-            document.getElementById('btn-sim-next').disabled = false;
-            document.getElementById('btn-sim-next').classList.remove('opacity-50');
-
-            clearSimLog();
-            appendSimLog(`Starting Step-by-Step. Input: <b>"${simString || 'ε'}"</b>`, "info");
-            activeStates = eClosure(new Set([startNode.id]));
-            let stateNames = Array.from(activeStates).map(id => nodes.find(n=>n.id===id).name).join(', ');
-            appendSimLog(`Initialization (with e-closure): States { ${stateNames} }`);
-            updateGraph();
-            if (simString.length === 0) evaluteFinalStep();
-        });
-
-        document.getElementById('btn-sim-next').addEventListener('click', () => {
-            if (!isSimulating) return;
-            let char = simString[simIndex];
-            appendSimLog(`Reading symbol: <b>'${char}'</b>`);
-            let moved = move(activeStates, char);
-            activeStates = eClosure(moved);
+        window.exportSVG = () => {
+            if(nodes.length === 0) return showToast("Canvas is empty");
+            const svgNode = document.getElementById("canvas").cloneNode(true);
+            svgNode.querySelector('.dragline').remove();
             
-            if (activeStates.size === 0) {
-                appendSimLog(`No valid transition. Automaton blocked.`, "error");
-                evaluteFinalStep(); updateGraph(); return;
-            } 
-            
-            let stateNames = Array.from(activeStates).map(id => nodes.find(n=>n.id===id).name).join(', ');
-            appendSimLog(`New active states: { ${stateNames} }`);
-            simIndex++; updateGraph();
-            if (simIndex >= simString.length) evaluteFinalStep();
-        });
+            // Remove the background dotted grid
+            const bgRect = svgNode.querySelector('rect');
+            if(bgRect) bgRect.remove();
 
-        function evaluteFinalStep() {
-            if (checkAcceptance()) appendSimLog("End of string. <b>ACCEPTED</b>", "success");
-            else appendSimLog("End of string. <b>REJECTED</b>", "error");
-            document.getElementById('btn-sim-next').classList.add('opacity-50');
-            document.getElementById('btn-sim-next').disabled = true;
+            // Calculate bounding box of all elements
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            nodes.forEach(n => {
+                minX = Math.min(minX, n.x - 60); maxX = Math.max(maxX, n.x + 60);
+                minY = Math.min(minY, n.y - 80); maxY = Math.max(maxY, n.y + 60);
+            });
+            links.forEach(l => {
+                minX = Math.min(minX, l.cp.x - 40); maxX = Math.max(maxX, l.cp.x + 40);
+                minY = Math.min(minY, l.cp.y - 40); maxY = Math.max(maxY, l.cp.y + 40);
+            });
+            
+            // Apply padding
+            const padding = 40;
+            minX -= padding; minY -= padding; maxX += padding; maxY += padding;
+            const width = maxX - minX; const height = maxY - minY;
+
+            // Reset zoom group transform and set specific viewBox
+            const zoomGrp = svgNode.querySelector('#zoom-group');
+            zoomGrp.removeAttribute('transform');
+            svgNode.setAttribute('viewBox', `${minX} ${minY} ${width} ${height}`);
+            svgNode.setAttribute('width', width);
+            svgNode.setAttribute('height', height);
+
+            let style = document.createElement('style');
+            style.textContent = `
+                .bg { fill: #fff; stroke: #d1d5db; stroke-width: 2px; }
+                .inner { fill: none; stroke: #d1d5db; stroke-width: 2px; }
+                .final .inner { display: block; } .inner { display: none; }
+                text { font-family: sans-serif; font-size: 14px; font-weight: 600; fill: #1d1d1f; text-anchor: middle; dominant-baseline: central; }
+                .start-arrow { fill: none; stroke: #1d1d1f; stroke-width: 2px; }
+                .link-path { fill: none; stroke: #9ca3af; stroke-width: 2.5px; }
+                .link-label-bg { fill: #fff; rx: 6px; ry: 6px; }
+                .link-label { font-size: 13px; fill: #1d1d1f; }
+                .control-point { display: none; }
+            `;
+            svgNode.prepend(style);
+            
+            const serializer = new XMLSerializer();
+            const source = serializer.serializeToString(svgNode);
+            const blob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
+            saveFile(blob, 'autolab_graph', '.svg', 'SVG Image', 'image/svg+xml');
+        };
+
+        window.exportPNG = () => {
+            if(nodes.length === 0) return showToast("Canvas is empty");
+            const svgNode = document.getElementById("canvas").cloneNode(true);
+            svgNode.querySelector('.dragline').remove();
+            
+            // Remove the background dotted grid
+            const bgRect = svgNode.querySelector('rect');
+            if(bgRect) bgRect.remove();
+
+            // Calculate bounding box of all elements
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            nodes.forEach(n => {
+                minX = Math.min(minX, n.x - 60); maxX = Math.max(maxX, n.x + 60);
+                minY = Math.min(minY, n.y - 80); maxY = Math.max(maxY, n.y + 60);
+            });
+            links.forEach(l => {
+                minX = Math.min(minX, l.cp.x - 40); maxX = Math.max(maxX, l.cp.x + 40);
+                minY = Math.min(minY, l.cp.y - 40); maxY = Math.max(maxY, l.cp.y + 40);
+            });
+            
+            // Apply padding
+            const padding = 40;
+            minX -= padding; minY -= padding; maxX += padding; maxY += padding;
+            const width = maxX - minX; const height = maxY - minY;
+
+            // Reset zoom group transform and set specific viewBox
+            const zoomGrp = svgNode.querySelector('#zoom-group');
+            zoomGrp.removeAttribute('transform');
+            svgNode.setAttribute('viewBox', `${minX} ${minY} ${width} ${height}`);
+            svgNode.setAttribute('width', width);
+            svgNode.setAttribute('height', height);
+
+            let style = document.createElement('style');
+            style.textContent = `
+                .bg { fill: #fff; stroke: #d1d5db; stroke-width: 2px; } .inner { fill: none; stroke: #d1d5db; stroke-width: 2px; }
+                .final .inner { display: block; } .inner { display: none; }
+                text { font-family: sans-serif; font-size: 14px; font-weight: 600; fill: #1d1d1f; text-anchor: middle; dominant-baseline: central; }
+                .start-arrow { fill: none; stroke: #1d1d1f; stroke-width: 2px; } .link-path { fill: none; stroke: #9ca3af; stroke-width: 2.5px; }
+                .link-label-bg { fill: #fff; rx: 6px; ry: 6px; } .link-label { font-size: 13px; fill: #1d1d1f; } .control-point { display: none; }
+            `;
+            svgNode.prepend(style);
+            
+            const xml = new XMLSerializer().serializeToString(svgNode);
+            const svg64 = btoa(unescape(encodeURIComponent(xml)));
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                // INCREASE QUALITY: Scale output up by 3x.
+                const scale = 3;
+                canvas.width = width * scale; 
+                canvas.height = height * scale;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.scale(scale, scale); // apply the scale globally to drawing operations
+                
+                ctx.fillStyle = document.documentElement.classList.contains('dark') ? '#0d0d0d' : '#f5f5f7';
+                ctx.fillRect(0, 0, width, height);
+                ctx.drawImage(img, 0, 0);
+                canvas.toBlob(blob => {
+                    saveFile(blob, 'autolab_graph', '.png', 'PNG Image', 'image/png');
+                });
+            };
+            img.src = 'data:image/svg+xml;base64,' + svg64;
+        };
+
+        // --- Regex to NFA ---
+        function insertExplicitConcat(exp) {
+            let res = "";
+            for(let i=0; i<exp.length; i++) {
+                let c1 = exp[i], c2 = i+1 < exp.length ? exp[i+1] : null;
+                res += c1;
+                if(c2 && !['|', ')', '*'].includes(c2) && !['|', '('].includes(c1)) res += '.';
+            }
+            return res;
         }
 
-        document.getElementById('btn-sim-stop').addEventListener('click', () => {
-            isSimulating = false; activeStates.clear(); updateGraph();
-            document.getElementById('btn-sim-start-step').classList.remove('hidden');
-            document.getElementById('btn-sim-quick').classList.remove('hidden');
-            document.getElementById('btn-sim-stop').classList.add('hidden');
-            document.getElementById('btn-sim-next').classList.add('hidden');
-            appendSimLog("Simulation stopped.");
-        });
+        function toPostfix(exp) {
+            let out = "", stack = [], prec = { '*': 3, '.': 2, '|': 1 };
+            for(let c of exp) {
+                if(/[a-zA-Z0-9]/.test(c)) out += c;
+                else if(c === '(') stack.push(c);
+                else if(c === ')') {
+                    while(stack.length && stack[stack.length-1] !== '(') out += stack.pop();
+                    stack.pop();
+                } else {
+                    while(stack.length && stack[stack.length-1] !== '(' && prec[c] <= prec[stack[stack.length-1]]) out += stack.pop();
+                    stack.push(c);
+                }
+            }
+            while(stack.length) out += stack.pop();
+            return out;
+        }
 
-        updateGraph();
+        window.generateFromRegex = () => {
+            let reg = document.getElementById('regex-input').value.replace(/\s+/g, '');
+            if(!reg) return;
+            try {
+                let postfix = toPostfix(insertExplicitConcat(reg));
+                let stack = [];
+                let localNId = 0, localLId = 0;
+                
+                const makeNode = (isFinal=false) => ({ id: `qr${localNId++}`, name: `q${localNId-1}`, isStart: false, isFinal, x:0, y:0 });
+                const makeLink = (s, t, l) => ({ id: `lr${localLId++}`, source: s, target: t, labels: [l], cp:{x:0,y:0}, customCp:false });
+                
+                for(let c of postfix) {
+                    if(c === '.') {
+                        let n2 = stack.pop(), n1 = stack.pop();
+                        n1.end.isFinal = false; n2.start.isStart = false;
+                        let l = makeLink(n1.end, n2.start, EPSILON);
+                        stack.push({ start: n1.start, end: n2.end, nodes: [...n1.nodes, ...n2.nodes], links: [...n1.links, ...n2.links, l] });
+                    } else if(c === '|') {
+                        let n2 = stack.pop(), n1 = stack.pop();
+                        let start = makeNode(), end = makeNode(true);
+                        n1.end.isFinal = false; n2.end.isFinal = false;
+                        let ls = [makeLink(start, n1.start, EPSILON), makeLink(start, n2.start, EPSILON), makeLink(n1.end, end, EPSILON), makeLink(n2.end, end, EPSILON)];
+                        stack.push({ start, end, nodes: [start, ...n1.nodes, ...n2.nodes, end], links: [...n1.links, ...n2.links, ...ls] });
+                    } else if(c === '*') {
+                        let n = stack.pop();
+                        let start = makeNode(), end = makeNode(true);
+                        n.end.isFinal = false;
+                        let ls = [makeLink(start, n.start, EPSILON), makeLink(start, end, EPSILON), makeLink(n.end, n.start, EPSILON), makeLink(n.end, end, EPSILON)];
+                        stack.push({ start, end, nodes: [start, ...n.nodes, end], links: [...n.links, ...ls] });
+                    } else {
+                        let start = makeNode(), end = makeNode(true);
+                        stack.push({ start, end, nodes: [start, end], links: [makeLink(start, end, c)] });
+                    }
+                }
+                
+                let res = stack.pop();
+                res.start.isStart = true;
+                nodes = res.nodes; links = res.links;
+                nId = localNId; lId = localLId;
+                
+                nodes.forEach(n => { n.x = window.innerWidth/2 + (Math.random()-0.5)*100; n.y = window.innerHeight/2 + (Math.random()-0.5)*100; });
+                clearSelection(); autoLayout(); showToast("Generated e-NFA");
+            } catch(e) { showToast("Invalid Regex structure"); }
+        };
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            t.classList.remove('opacity-0', 'translate-y-4');
+            t.classList.add('opacity-100', 'translate-y-0');
+            setTimeout(() => {
+                t.classList.remove('opacity-100', 'translate-y-0');
+                t.classList.add('opacity-0', 'translate-y-4');
+            }, 2500);
+        }
+
+        window.addEventListener('resize', () => svg.attr('width', window.innerWidth).attr('height', window.innerHeight));
+        
+        // Initial Render Call to set up empty state layout
+        render();
     </script>
 </body>
 </html>
