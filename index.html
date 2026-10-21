@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AutoLab - Advanced Automata Simulator</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="logo.png">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- D3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        apple: { bg: '#f5f5f7', darkBg: '#000000', blue: '#007AFF', green: '#34C759', red: '#FF3B30' }
+                    },
+                    boxShadow: { 'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.1)', 'float': '0 10px 40px rgba(0,0,0,0.15)' }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #f5f5f7; font-family: 'Inter', sans-serif; }
+        .dark body { background-color: #0d0d0d; }
+        
+        /* Glassmorphism utilities */
+        .glass {
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+        .dark .glass {
+            background: rgba(30, 30, 30, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* SVG Canvas */
+        #canvas { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; outline: none; }
+        
+        /* D3 Elements */
+        .node circle.bg { fill: #ffffff; stroke: #d1d5db; stroke-width: 2px; transition: all 0.2s ease; cursor: pointer; }
+        .dark .node circle.bg { fill: #1c1c1e; stroke: #3a3a3c; }
+        
+        .node:hover circle.bg { stroke: #007AFF; }
+        .node.selected circle.bg { stroke: #007AFF; stroke-width: 3.5px; box-shadow: 0 0 10px rgba(0,122,255,0.5); }
+        .node.multi-selected circle.bg { stroke: #34C759; stroke-width: 3.5px; box-shadow: 0 0 10px rgba(52,199,89,0.5); }
+        .node.active circle.bg { fill: #e5f0ff; stroke: #007AFF; }
+        .dark .node.active circle.bg { fill: #0a2540; stroke: #007AFF; }
+        
+        .node.final circle.inner { fill: none; stroke: #d1d5db; stroke-width: 2px; pointer-events: none; }
+        .dark .node.final circle.inner { stroke: #3a3a3c; }
+        .node.final.selected circle.inner, .node.final:hover circle.inner { stroke: #007AFF; }
+        .node.final.multi-selected circle.inner { stroke: #34C759; }
+        
+        .node text { font-size: 14px; font-weight: 600; fill: #1d1d1f; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+        .dark .node text { fill: #f5f5f7; }
+        
+        .start-arrow { fill: none; stroke: #1d1d1f; stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+        .dark .start-arrow { stroke: #f5f5f7; }
+
+        .link-path { fill: none; stroke: #9ca3af; stroke-width: 2.5px; cursor: pointer; transition: stroke 0.2s ease; }
+        .dark .link-path { stroke: #4b5563; }
+        .link-group:hover .link-path, .link-group.selected .link-path { stroke: #007AFF; stroke-width: 3.5px; }
+        
+        .control-point { fill: #ffffff; stroke: #007AFF; stroke-width: 2px; cursor: grab; opacity: 0.6; transition: opacity 0.2s, r 0.2s; }
+        .dark .control-point { fill: #1c1c1e; }
+        .control-point:active { cursor: grabbing; }
+        .link-group:hover .control-point, .link-group.selected .control-point { opacity: 1; r: 6px; }
+
+        .link-label-bg { fill: rgba(255,255,255,0.85); rx: 6px; ry: 6px; pointer-events: none; }
+        .dark .link-label-bg { fill: rgba(0,0,0,0.85); }
+        .link-label { font-size: 13px; font-weight: 700; fill: #1d1d1f; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+        .dark .link-label { fill: #f5f5f7; }
+        
+        .dragline { fill: none; stroke: #007AFF; stroke-width: 3px; stroke-dasharray: 6,6; pointer-events: none; }
+        .marquee { fill: rgba(0,122,255,0.1); stroke: #007AFF; stroke-width: 1px; stroke-dasharray: 4,4; pointer-events: none; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.5); border-radius: 10px; }
+        
+        /* Animations */
+        .fade-in { animation: fadeIn 0.2s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+
+        .timeline-line::before { content: ''; position: absolute; left: 11px; top: 10px; bottom: -10px; width: 2px; background: #e5e7eb; z-index: 0; }
+        .dark .timeline-line::before { background: #374151; }
+        .timeline-item:last-child .timeline-line::before { display: none; }
+
+        /* Mobile Blocker Overlay */
+        #mobile-blocker { display: none; }
+        @media (max-width: 767px) {
+            #mobile-blocker {
+                display: flex;
+                position: fixed; inset: 0; z-index: 999999;
+                background: #f5f5f7;
+                flex-direction: column; justify-content: center; align-items: center;
+                text-align: center; padding: 2rem;
+            }
+            .dark #mobile-blocker { background: #0d0d0d; }
+            #app-content { display: none !important; }
+        }
+    </style>
+</head>
+<body class="text-slate-800 dark:text-slate-200 antialiased selection:bg-apple-blue selection:text-white">
+
+    <!-- Mobile Blocker -->
+    <div id="mobile-blocker">
+        <i class="ph-duotone ph-desktop text-6xl text-apple-blue mb-4"></i>
+        <h2 class="text-2xl font-bold mb-2 text-slate-800 dark:text-slate-200">Not Supported</h2>
+        <p class="text-slate-500 font-medium">Site not available on this device</p>
+    </div>
+
+    <!-- Main App Content -->
+    <div id="app-content">
+        <!-- Empty Canvas Tutorial -->
+        <div id="empty-state-hint" class="fixed inset-0 flex items-center justify-center pointer-events-none z-10 transition-opacity duration-300 opacity-100">
+            <div class="glass px-8 py-6 rounded-3xl shadow-glass flex flex-col items-center gap-4 text-slate-500 dark:text-slate-400">
+                <i class="ph-duotone ph-magic-wand text-4xl text-apple-blue opacity-80"></i>
+                <div class="text-center">
+                    <h3 class="text-lg font-bold text-slate-800 dark:text-slate-200 mb-1">Canvas is empty</h3>
+                    <p class="text-sm">Start building your automaton.</p>
+                </div>
+                <div class="flex flex-col gap-2 mt-2 text-sm font-medium w-full">
+                    <div class="flex items-center gap-3 bg-white/50 dark:bg-black/50 px-4 py-2.5 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
+                        <span class="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded text-xs shadow-sm">Double Click</span> 
+                        <span>Add a state</span>
+                    </div>
+                    <div class="flex items-center gap-3 bg-white/50 dark:bg-black/50 px-4 py-2.5 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
+                        <span class="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded text-xs shadow-sm">Shift + Drag</span> 
+                        <span>Connect states (or Select Multiple)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SVG Canvas -->
+        <svg id="canvas" tabindex="0">
+            <defs>
+                <pattern id="dot-grid" width="30" height="30" patternUnits="userSpaceOnUse">
+                    <circle cx="2" cy="2" r="1.5" fill="#d1d5db" class="dark:fill-slate-800"></circle>
+                </pattern>
+                <marker id="arrow" viewBox="0 -5 10 10" refX="26" refY="0" markerWidth="6" markerHeight="6" orient="auto">
+                    <path d="M0,-5L10,0L0,5" fill="#9ca3af" class="dark:fill-slate-500"></path>
+                </marker>
+                <marker id="arrow-selected" viewBox="0 -5 10 10" refX="26" refY="0" markerWidth="6" markerHeight="6" orient="auto">
+                    <path d="M0,-5L10,0L0,5" fill="#007AFF"></path>
+                </marker>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#dot-grid)"></rect>
+            <g id="zoom-group">
+                <g id="links-layer"></g>
+                <g id="nodes-layer"></g>
+                <path class="dragline hidden" d="M0,0L0,0"></path>
+                <rect id="marquee" class="marquee hidden" x="0" y="0" width="0" height="0"></rect>
+            </g>
+        </svg>
+
+        <!-- Top Toolbar -->
+        <div class="absolute top-6 left-1/2 transform -translate-x-1/2 z-20 glass rounded-full shadow-glass px-5 py-2.5 flex items-center gap-5 border border-slate-200 dark:border-slate-700/50">
+            <!-- Title -->
+            <div class="font-bold tracking-tight text-base flex items-center gap-2">
+                <i class="ph-fill ph-infinity text-apple-blue text-xl"></i> AutoLab
+            </div>
+
+            <div class="h-5 w-px bg-slate-300 dark:bg-slate-700"></div>
+            
+            <!-- Mode Switch (FSA / PDA) -->
+            <div id="mode-toggle-container" class="relative flex items-center bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-xl shadow-inner border border-slate-200/50 dark:border-slate-700/50">
+                <div id="mode-slider" class="absolute left-1 top-1 bottom-1 w-[calc(50%-4px)] bg-white dark:bg-slate-700 rounded-lg shadow-sm transition-transform duration-300 ease-out z-0"></div>
+                <button id="btn-fsa" onclick="setMode(false)" class="relative z-10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 w-14 text-center transition-colors focus:outline-none">FSA</button>
+                <button id="btn-pda" onclick="setMode(true)" class="relative z-10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 w-14 text-center transition-colors focus:outline-none">PDA</button>
+            </div>
+
+            <div class="h-5 w-px bg-slate-300 dark:bg-slate-700"></div>
+
+            <!-- Undo / Redo / Snap -->
+            <div class="flex items-center gap-1">
+                <button onclick="undo()" class="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-apple-blue transition-all" title="Undo (Ctrl+Z)">
+                    <i class="ph ph-arrow-u-up-left text-lg"></i>
+                </button>
+                <button onclick="redo()" class="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-apple-blue transition-all" title="Redo (Ctrl+Y)">
+                    <i class="ph ph-arrow-u-up-right text-lg"></i>
+                </button>
+                <button onclick="toggleSnap()" id="btn-snap" class="p-1.5 ml-2 rounded-lg text-slate-400 hover:text-apple-blue transition-all flex items-center gap-1" title="Toggle Snap to Grid">
+                    <i class="ph ph-grid-four text-lg"></i>
+                </button>
+            </div>
+
+            <div class="h-5 w-px bg-slate-300 dark:bg-slate-700"></div>
+
+            <!-- Export/Import -->
+            <div class="flex items-center gap-1">
+                <input type="file" id="import-json" class="hidden" accept=".json">
+                <button onclick="document.getElementById('import-json').click()" class="px-2 py-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-apple-blue transition-colors flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider" title="Open JSON">
+                    <i class="ph ph-folder-open text-base"></i> Open
+                </button>
+                <div class="relative group">
+                    <button class="px-2 py-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-apple-blue transition-colors flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider">
+                        <i class="ph ph-export text-base"></i> Export <i class="ph ph-caret-down text-xs"></i>
+                    </button>
+                    <div class="absolute top-full left-0 mt-2 w-32 glass rounded-xl shadow-glass flex flex-col py-1 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity border border-slate-200 dark:border-slate-700">
+                        <button onclick="exportJSON()" class="text-left px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-apple-blue hover:text-white transition-colors">JSON</button>
+                        <button onclick="exportPNG()" class="text-left px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-apple-blue hover:text-white transition-colors">PNG</button>
+                        <button onclick="exportSVG()" class="text-left px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-apple-blue hover:text-white transition-colors">SVG</button>
+                        <div class="h-px bg-slate-200 dark:bg-slate-700 my-1"></div>
+                        <button onclick="exportTikZ()" class="text-left px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-apple-blue hover:text-white transition-colors">LaTeX (TikZ)</button>
+                        <button onclick="exportJFLAP()" class="text-left px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-apple-blue hover:text-white transition-colors">JFLAP (.jff)</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="h-5 w-px bg-slate-300 dark:bg-slate-700"></div>
+            <button onclick="toggleTheme()" class="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-apple-blue transition-colors">
+                <i id="theme-icon" class="ph ph-moon text-lg"></i>
+            </button>
+        </div>
+
+        <!-- Floating Tools (Left) -->
+        <div class="absolute top-24 left-6 w-80 z-20 glass rounded-2xl shadow-glass flex flex-col max-h-[calc(100vh-8rem)] overflow-hidden border border-slate-200 dark:border-slate-700/50">
+            <!-- Tabs -->
+            <div class="p-2 border-b border-slate-200/50 dark:border-slate-700/50 bg-white/40 dark:bg-black/40">
+                <div class="flex bg-slate-200/50 dark:bg-slate-800/50 rounded-xl p-1 gap-1">
+                    <button onclick="switchTab('sim')" id="tab-sim" class="flex-1 text-[11px] font-semibold py-1.5 rounded-lg bg-white dark:bg-slate-700 shadow-sm transition-all text-slate-800 dark:text-slate-200">Simulate</button>
+                    <button onclick="switchTab('batch')" id="tab-batch" class="flex-1 text-[11px] font-semibold py-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all">Batch</button>
+                    <button onclick="switchTab('regex')" id="tab-regex" class="flex-1 text-[11px] font-semibold py-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all">Regex</button>
+                    <button onclick="switchTab('tools')" id="tab-tools" class="flex-1 text-[11px] font-semibold py-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all">Tools</button>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto relative">
+                <!-- Simulation Tab -->
+                <div id="view-sim" class="p-5 flex flex-col gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1.5">Input String</label>
+                        <input type="text" id="sim-input" class="w-full bg-white/60 dark:bg-black/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-apple-blue font-mono transition-shadow shadow-inner" placeholder="">
+                    </div>
+                    <div class="flex gap-2" id="sim-start-controls">
+                        <button onclick="quickSimulation()" class="flex-1 bg-apple-blue hover:bg-blue-600 text-white text-xs font-bold py-2.5 rounded-xl transition-all shadow-sm active:scale-95">Quick Run</button>
+                        <button onclick="startStepSimulation()" class="flex-1 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 text-xs font-bold py-2.5 rounded-xl transition-all shadow-sm active:scale-95">Step-by-Step</button>
+                    </div>
+                    
+                    <div id="step-controls" class="hidden flex gap-2">
+                        <button onclick="nextStep()" class="flex-1 bg-apple-green hover:bg-green-600 text-white text-xs font-bold py-2.5 rounded-xl transition-all shadow-sm active:scale-95 flex justify-center items-center gap-1">Next <i class="ph ph-arrow-right"></i></button>
+                        <button onclick="stopSimulation()" class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 text-xs font-bold px-4 rounded-xl transition-all active:scale-95"><i class="ph ph-stop"></i></button>
+                    </div>
+
+                    <!-- Modern Timeline Log -->
+                    <div class="mt-2 flex-1 min-h-[160px] max-h-64 overflow-y-auto bg-white/30 dark:bg-black/30 border border-slate-200/50 dark:border-slate-700/50 rounded-xl p-3 shadow-inner">
+                        <div id="sim-timeline" class="flex flex-col gap-2">
+                            <div class="text-xs text-slate-400 italic text-center mt-4">Simulation logs will appear here.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Batch Tab -->
+                <div id="view-batch" class="hidden p-5 flex flex-col gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1.5 flex justify-between">
+                            Test Strings
+                            <span class="flex gap-2">
+                                <input type="file" id="batch-file-input" class="hidden" accept=".txt,.csv">
+                                <button onclick="document.getElementById('batch-file-input').click()" class="text-apple-blue hover:underline cursor-pointer"><i class="ph ph-upload-simple"></i> Load</button>
+                                <button onclick="exportBatchResults()" class="text-apple-blue hover:underline cursor-pointer"><i class="ph ph-download-simple"></i> Save</button>
+                            </span>
+                        </label>
+                        <textarea id="batch-input" class="w-full h-24 bg-white/60 dark:bg-black/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-apple-blue font-mono transition-shadow shadow-inner resize-none" placeholder="aab&#10;bb&#10;aba"></textarea>
+                    </div>
+                    <button onclick="runBatch()" class="w-full bg-apple-blue hover:bg-blue-600 text-white text-xs font-bold py-2.5 rounded-xl transition-all shadow-sm active:scale-95">Run All</button>
+                    <div class="mt-2 flex-1 max-h-40 overflow-y-auto bg-white/30 dark:bg-black/30 border border-slate-200/50 dark:border-slate-700/50 rounded-xl shadow-inner">
+                        <ul id="batch-results" class="divide-y divide-slate-200/50 dark:divide-slate-700/50">
+                            <li class="p-3 text-center text-xs text-slate-400 italic">Results appear here</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Regex Tab -->
+                <div id="view-regex" class="hidden p-5 flex flex-col gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1.5">Regular Expression</label>
+                        <input type="text" id="regex-input" class="w-full bg-white/60 dark:bg-black/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-apple-blue font-mono transition-shadow shadow-inner" placeholder="(a|b)*abb">
+                        <p class="text-[10px] text-slate-400 mt-2 leading-relaxed">Supported: <code class="bg-slate-200 dark:bg-slate-800 px-1 rounded">|</code>, <code class="bg-slate-200 dark:bg-slate-800 px-1 rounded">*</code>, implicit concatenation, and parentheses.</p>
+                    </div>
+                    <button onclick="prepGenerateFromRegex()" class="w-full bg-apple-blue hover:bg-blue-600 text-white text-xs font-bold py-2.5 rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2">
+                        <i class="ph ph-magic-wand"></i> Generate NFA
+                    </button>
+                </div>
+
+                <!-- Tools Tab -->
+                <div id="view-tools" class="hidden p-5 flex flex-col gap-3">
+                    <button onclick="prepNfaToDfa()" class="w-full text-left px-4 py-3 bg-white/50 dark:bg-black/50 hover:bg-white dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all flex items-center justify-between group">
+                        <div>
+                            <div class="text-sm font-semibold text-slate-800 dark:text-slate-200">NFA to DFA</div>
+                            <div class="text-[10px] text-slate-500 mt-0.5">Convert immediately</div>
+                        </div>
+                        <i class="ph ph-magic-wand text-slate-400 group-hover:text-apple-blue transition-colors text-lg"></i>
+                    </button>
+                    <button onclick="prepMinimizeDfa()" class="w-full text-left px-4 py-3 bg-white/50 dark:bg-black/50 hover:bg-white dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all flex items-center justify-between group">
+                        <div>
+                            <div class="text-sm font-semibold text-slate-800 dark:text-slate-200">Minimize DFA</div>
+                            <div class="text-[10px] text-slate-500 mt-0.5">Optimize immediately</div>
+                        </div>
+                        <i class="ph ph-scissors text-slate-400 group-hover:text-apple-blue transition-colors text-lg"></i>
+                    </button>
+                    <button onclick="autoLayout()" class="w-full text-left px-4 py-3 bg-white/50 dark:bg-black/50 hover:bg-white dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all flex items-center justify-between group">
+                        <div>
+                            <div class="text-sm font-semibold text-slate-800 dark:text-slate-200">Auto-Layout</div>
+                            <div class="text-[10px] text-slate-500 mt-0.5">Organize nodes via physics</div>
+                        </div>
+                        <i class="ph ph-intersect text-slate-400 group-hover:text-apple-blue transition-colors text-lg"></i>
+                    </button>
+                    <button onclick="clearCanvas()" class="w-full text-left px-4 py-3 mt-4 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-xl transition-all flex items-center justify-between group text-rose-600 dark:text-rose-400">
+                        <div class="text-sm font-semibold">Clear Canvas</div>
+                        <i class="ph ph-trash text-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Floating Inspector (Right) - Draggable Clamped -->
+        <div class="absolute top-24 right-6 w-80 z-20 glass rounded-2xl shadow-glass flex flex-col max-h-[calc(100vh-8rem)] transition-all duration-300 opacity-0 pointer-events-none border border-slate-200 dark:border-slate-700/50" id="inspector-panel">
+            <div id="inspector-header" class="px-5 py-4 border-b border-slate-200/50 dark:border-slate-700/50 flex justify-between items-center bg-white/40 dark:bg-black/40 rounded-t-2xl cursor-grab active:cursor-grabbing select-none">
+                <h3 class="text-sm font-semibold tracking-tight pointer-events-none" id="inspector-title">Properties</h3>
+                <button onclick="clearSelection()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"><i class="ph ph-x"></i></button>
+            </div>
+            <div class="p-5 flex flex-col gap-5 overflow-y-auto" id="inspector-content">
+                <!-- Dynamically populated -->
+            </div>
+        </div>
+
+        <!-- Edge Creation Modal -->
+        <div id="edge-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm transition-opacity">
+            <div class="glass w-80 rounded-2xl shadow-float p-6 fade-in border border-slate-200 dark:border-slate-700">
+                <h3 class="text-lg font-bold mb-1 text-slate-800 dark:text-slate-100">New Transition</h3>
+                <p class="text-xs text-slate-500 mb-4" id="edge-hint">Enter symbols separated by commas. Use 'eps' for epsilon.</p>
+                <input type="text" id="edge-input" class="w-full bg-white/70 dark:bg-black/70 border border-slate-300 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-apple-blue focus:ring-1 focus:ring-apple-blue font-mono mb-5" placeholder="a, b">
+                <div class="flex justify-end gap-2">
+                    <button onclick="cancelEdge()" class="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+                    <button onclick="confirmEdge()" class="px-4 py-2 rounded-xl text-sm font-bold bg-apple-blue hover:bg-blue-600 text-white shadow-sm transition-colors">Create</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notification Toast -->
+        <div id="toast" class="absolute bottom-10 left-1/2 transform -translate-x-1/2 glass px-4 py-2 rounded-full shadow-lg text-sm font-medium transition-all duration-300 opacity-0 translate-y-4 pointer-events-none z-50 flex items-center gap-2">
+            <i class="ph-fill ph-info text-apple-blue"></i> <span id="toast-msg"></span>
+        </div>
+    </div>
+
+    <script>
+        // --- Core Data & Config ---
+        const EPSILON = 'ε';
+        const NODE_R = 24;
+        const GRID_SIZE = 30; 
+        
+        let nodes = [];
+        let links = [];
+        let nId = 0, lId = 0;
+        
+        let selectedEl = null;
+        let selectedType = null;
+        let pendingEdge = null; 
+        
+        let snapToGrid = false;
+        let isPDA = false;
+        let multiSelectedNodes = new Set();
+        let simState = { active: new Set(), str: '', idx: 0, running: false }; 
+
+        // --- History & LocalStorage ---
+        let history = [];
+        let historyIdx = -1;
+        let isUndoing = false;
+        
+        const LS_KEY = 'autolab_autosave';
+
+        function saveState() {
+            if (isUndoing) return;
+            history = history.slice(0, historyIdx + 1);
+            let state = {
+                nodes: nodes.map(n => ({...n})),
+                links: links.map(l => ({...l, source: l.source.id, target: l.target.id, labels: [...l.labels], cp: {...l.cp}, customCp: l.customCp})),
+                nId: nId, lId: lId, isPDA: isPDA
+            };
+            history.push(state);
+            historyIdx++;
+            localStorage.setItem(LS_KEY, JSON.stringify(state));
+        }
+
+        function loadState(state) {
+            setMode(state.isPDA || false); 
+            
+            nodes = state.nodes.map(n => ({...n, description: n.description || ''}));
+            links = state.links.map(l => ({
+                ...l,
+                source: nodes.find(n => n.id === l.source),
+                target: nodes.find(n => n.id === l.target),
+                labels: [...l.labels],
+                cp: {...l.cp}
+            }));
+            nId = state.nId || 0;
+            lId = state.lId || 0;
+            clearSelection();
+            render();
+        }
+
+        function loadFromLocal() {
+            try {
+                let saved = localStorage.getItem(LS_KEY);
+                if (saved) {
+                    let st = JSON.parse(saved);
+                    loadState(st);
+                    history = [st];
+                    historyIdx = 0;
+                } else {
+                    saveState();
+                }
+            } catch (e) { saveState(); }
+        }
+
+        window.undo = () => {
+            if (historyIdx > 0) {
+                isUndoing = true; historyIdx--; loadState(history[historyIdx]); isUndoing = false;
+                localStorage.setItem(LS_KEY, JSON.stringify(history[historyIdx]));
+            } else { showToast("Nothing to undo"); }
+        };
+
+        window.redo = () => {
+            if (historyIdx < history.length - 1) {
+                isUndoing = true; historyIdx++; loadState(history[historyIdx]); isUndoing = false;
+                localStorage.setItem(LS_KEY, JSON.stringify(history[historyIdx]));
+            } else { showToast("Nothing to redo"); }
+        };
+
+        window.toggleSnap = () => {
+            snapToGrid = !snapToGrid;
+            const btn = document.getElementById('btn-snap');
+            if(snapToGrid) {
+                btn.classList.add('text-apple-blue', 'bg-apple-blue/10'); btn.classList.remove('text-slate-400');
+                showToast("Snap to Grid: ON");
+                nodes.forEach(n => { n.x = Math.round(n.x/GRID_SIZE)*GRID_SIZE; n.y = Math.round(n.y/GRID_SIZE)*GRID_SIZE; });
+                render(); saveState();
+            } else {
+                btn.classList.remove('text-apple-blue', 'bg-apple-blue/10'); btn.classList.add('text-slate-400');
+                showToast("Snap to Grid: OFF");
+            }
+        };
+
+        window.setMode = (pda) => {
+            isPDA = pda;
+            const slider = document.getElementById('mode-slider');
+            const btnFSA = document.getElementById('btn-fsa');
+            const btnPDA = document.getElementById('btn-pda');
+            
+            if(pda) {
+                slider.style.transform = 'translateX(100%)';
+                btnFSA.classList.replace('text-slate-800', 'text-slate-500');
+                btnFSA.classList.replace('dark:text-slate-200', 'dark:text-slate-400');
+                btnFSA.classList.add('hover:text-slate-800', 'dark:hover:text-slate-200');
+                
+                btnPDA.classList.replace('text-slate-500', 'text-slate-800');
+                btnPDA.classList.replace('dark:text-slate-400', 'dark:text-slate-200');
+                btnPDA.classList.remove('hover:text-slate-800', 'dark:hover:text-slate-200');
+            } else {
+                slider.style.transform = 'translateX(0)';
+                btnFSA.classList.replace('text-slate-500', 'text-slate-800');
+                btnFSA.classList.replace('dark:text-slate-400', 'dark:text-slate-200');
+                btnFSA.classList.remove('hover:text-slate-800', 'dark:hover:text-slate-200');
+                
+                btnPDA.classList.replace('text-slate-800', 'text-slate-500');
+                btnPDA.classList.replace('dark:text-slate-200', 'dark:text-slate-400');
+                btnPDA.classList.add('hover:text-slate-800', 'dark:hover:text-slate-200');
+            }
+            showToast(isPDA ? "PDA Mode Active" : "FSA Mode Active");
+            saveState();
+        };
+
+        // --- D3 Canvas Setup ---
+        const svg = d3.select("#canvas");
+        const zoomGroup = svg.select("#zoom-group");
+        const linksLayer = zoomGroup.select("#links-layer");
+        const nodesLayer = zoomGroup.select("#nodes-layer");
+        const dragLine = zoomGroup.select(".dragline");
+        const marqueeRect = zoomGroup.select("#marquee");
+        const emptyHint = document.getElementById("empty-state-hint");
+
+        const zoom = d3.zoom().scaleExtent([0.2, 3])
+            .filter(e => !e.shiftKey) // Disable zoom pan on shift (used for marquee)
+            .on("zoom", e => zoomGroup.attr("transform", e.transform));
+        svg.call(zoom).on("dblclick.zoom", null);
+
+        // --- Marquee & Global Interactions ---
+        let marqueeStart = null;
+        
+        svg.on("mousedown", (e) => {
+            if (e.target.tagName !== 'svg' && e.target.tagName !== 'rect') return;
+            if (e.shiftKey) {
+                let [x, y] = d3.pointer(e, zoomGroup.node());
+                marqueeStart = {x, y};
+                marqueeRect.classed("hidden", false).attr("x", x).attr("y", y).attr("width", 0).attr("height", 0);
+            } else {
+                clearSelection();
+            }
+        });
+        
+        svg.on("mousemove", (e) => {
+            if(marqueeStart) {
+                let [px, py] = d3.pointer(e, zoomGroup.node());
+                let mx = Math.min(marqueeStart.x, px);
+                let my = Math.min(marqueeStart.y, py);
+                let mw = Math.abs(px - marqueeStart.x);
+                let mh = Math.abs(py - marqueeStart.y);
+                marqueeRect.attr("x", mx).attr("y", my).attr("width", mw).attr("height", mh);
+            }
+        });
+        
+        svg.on("mouseup", (e) => {
+            if(marqueeStart) {
+                let [px, py] = d3.pointer(e, zoomGroup.node());
+                let minX = Math.min(marqueeStart.x, px), maxX = Math.max(marqueeStart.x, px);
+                let minY = Math.min(marqueeStart.y, py), maxY = Math.max(marqueeStart.y, py);
+                
+                multiSelectedNodes.clear();
+                nodes.forEach(n => {
+                    if (n.x >= minX && n.x <= maxX && n.y >= minY && n.y <= maxY) {
+                        multiSelectedNodes.add(n);
+                    }
+                });
+                marqueeRect.classed("hidden", true);
+                marqueeStart = null;
+                render();
+            }
+        });
+
+        svg.on("dblclick", (e) => {
+            if (e.target.tagName !== 'svg' && e.target.tagName !== 'rect') return;
+            let [x, y] = d3.pointer(e, zoomGroup.node());
+            if (snapToGrid) { x = Math.round(x/GRID_SIZE)*GRID_SIZE; y = Math.round(y/GRID_SIZE)*GRID_SIZE; }
+            addNode(x, y);
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            if (!document.getElementById('edge-modal').classList.contains('hidden')) return;
+
+            if (e.key === 'Backspace' || e.key === 'Delete') deleteSelected();
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+            if (((e.ctrlKey || e.metaKey) && e.key === 'y') || ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z'))) { e.preventDefault(); redo(); }
+        });
+
+        let isDrawing = false;
+        let drawingSource = null;
+
+        const nodeDrag = d3.drag()
+            .on("start", function(e, d) {
+                if (e.sourceEvent.shiftKey) {
+                    isDrawing = true; drawingSource = d;
+                    dragLine.classed("hidden", false).attr("d", `M${d.x},${d.y} L${d.x},${d.y}`);
+                } else {
+                    if(!multiSelectedNodes.has(d)) {
+                        selectEl(d, 'node'); 
+                    }
+                    d3.select(this).raise();
+                }
+            })
+            .on("drag", (e, d) => {
+                if (isDrawing) {
+                    let [px, py] = d3.pointer(e, zoomGroup.node());
+                    dragLine.attr("d", `M${drawingSource.x},${drawingSource.y} L${px},${py}`);
+                } else {
+                    let oldX = d.x, oldY = d.y;
+                    let targetX = e.x, targetY = e.y;
+                    
+                    if (snapToGrid) {
+                        targetX = Math.round(e.x / GRID_SIZE) * GRID_SIZE;
+                        targetY = Math.round(e.y / GRID_SIZE) * GRID_SIZE;
+                    }
+                    let dx = targetX - oldX;
+                    let dy = targetY - oldY;
+
+                    if(multiSelectedNodes.has(d)) {
+                        multiSelectedNodes.forEach(n => { n.x += dx; n.y += dy; });
+                    } else {
+                        d.x = targetX; d.y = targetY;
+                    }
+
+                    links.forEach(l => {
+                        let srcIn = multiSelectedNodes.has(l.source) || l.source === d;
+                        let tgtIn = multiSelectedNodes.has(l.target) || l.target === d;
+                        
+                        if(srcIn || tgtIn) {
+                            if(!l.customCp) l.cp = computeDefaultCP(l.source, l.target);
+                            else if(srcIn && tgtIn) { l.cp.x += dx; l.cp.y += dy; }
+                            else { l.cp.x += dx * 0.5; l.cp.y += dy * 0.5; }
+                        }
+                    });
+                    render();
+                }
+            })
+            .on("end", (e, d) => {
+                if (isDrawing) {
+                    dragLine.classed("hidden", true);
+                    let [px, py] = d3.pointer(e, zoomGroup.node());
+                    let target = nodes.find(n => Math.hypot(n.x - px, n.y - py) < NODE_R * 1.5);
+                    if (target) promptEdge(drawingSource, target);
+                    isDrawing = false; drawingSource = null;
+                } else {
+                    saveState(); 
+                }
+            });
+
+        const cpDrag = d3.drag()
+            .on("start", function(e, d) { selectEl(d, 'link'); })
+            .on("drag", function(e, d) { d.customCp = true; d.cp.x += e.dx; d.cp.y += e.dy; render(); })
+            .on("end", () => { saveState(); }); 
+
+        function computeDefaultCP(s, t) {
+            if (s === t) return { x: s.x, y: s.y - 80 };
+            let dx = t.x - s.x, dy = t.y - s.y;
+            let len = Math.hypot(dx, dy) || 1;
+            let nx = -dy / len, ny = dx / len;
+            let offset = 30; 
+            return { x: (s.x + t.x)/2 + nx*offset, y: (s.y + t.y)/2 + ny*offset };
+        }
+
+        function addNode(x, y) {
+            let n = { id: `q${nId++}`, name: `q${nId-1}`, description: '', x, y, isStart: nodes.length === 0, isFinal: false };
+            nodes.push(n); multiSelectedNodes.clear(); selectEl(n, 'node'); render(); saveState();
+        }
+
+        function promptEdge(source, target) {
+            let existing = links.find(l => l.source === source && l.target === target);
+            if (existing) { selectEl(existing, 'link'); return; }
+            pendingEdge = { source, target };
+            
+            const hint = document.getElementById('edge-hint');
+            const inp = document.getElementById('edge-input');
+            if (isPDA) {
+                hint.innerText = "PDA format: read, pop ; push (e.g. 'a, Z ; AZ' or 'eps, eps ; eps')";
+                inp.placeholder = "a, Z ; AZ";
+            } else {
+                hint.innerText = "Enter symbols separated by commas. Use 'eps' for epsilon.";
+                inp.placeholder = "a, b";
+            }
+            
+            document.getElementById('edge-modal').classList.remove('hidden');
+            inp.value = ''; inp.focus();
+            inp.onkeydown = (e) => { if (e.key === 'Enter') confirmEdge(); if(e.key === 'Escape') cancelEdge(); };
+        }
+
+        function cancelEdge() { pendingEdge = null; document.getElementById('edge-modal').classList.add('hidden'); }
+
+        function confirmEdge() {
+            if (!pendingEdge) return;
+            let raw = document.getElementById('edge-input').value;
+            if (!raw.trim()) { showToast("Please enter symbols."); return; }
+            
+            let labels = [];
+            if(isPDA) {
+                labels = raw.split('|').map(s => {
+                    let parts = s.trim(); 
+                    if(!parts.includes(';')) parts = parts.replace(',', ',eps;eps');
+                    return parts.replace(/eps/ig, EPSILON);
+                });
+            } else {
+                labels = raw.split(',').map(s => s.trim()).filter(s => s).map(l => l.toLowerCase() === 'eps' ? EPSILON : l);
+            }
+
+            let l = { id: `l${lId++}`, source: pendingEdge.source, target: pendingEdge.target, labels, cp: computeDefaultCP(pendingEdge.source, pendingEdge.target), customCp: false };
+            links.push(l);
+            multiSelectedNodes.clear(); selectEl(l, 'link'); render(); saveState(); cancelEdge();
+        }
+
+        function deleteSelected() {
+            if (multiSelectedNodes.size > 0) {
+                let ids = new Set(Array.from(multiSelectedNodes).map(n=>n.id));
+                links = links.filter(l => !ids.has(l.source.id) && !ids.has(l.target.id));
+                nodes = nodes.filter(n => !ids.has(n.id));
+                multiSelectedNodes.clear();
+            } else if (selectedEl) {
+                if (selectedType === 'node') {
+                    links = links.filter(l => l.source !== selectedEl && l.target !== selectedEl);
+                    nodes = nodes.filter(n => n !== selectedEl);
+                } else if (selectedType === 'link') {
+                    links = links.filter(l => l !== selectedEl);
+                }
+            }
+            if(nodes.length > 0 && !nodes.some(n=>n.isStart)) nodes[0].isStart = true;
+            clearSelection(); render(); saveState();
+        }
+
+        function render() {
+            emptyHint.style.opacity = nodes.length === 0 ? '1' : '0';
+
+            // Links
+            let linkSel = linksLayer.selectAll("g.link-group").data(links, d => d.id);
+            linkSel.exit().remove();
+            
+            let linkEnter = linkSel.enter().append("g").attr("class", "link-group")
+                .on("click", (e, d) => { e.stopPropagation(); multiSelectedNodes.clear(); selectEl(d, 'link'); });
+
+            linkEnter.append("path").attr("class", "link-path");
+            linkEnter.append("circle").attr("class", "control-point").attr("r", 4.5).call(cpDrag);
+            let lblG = linkEnter.append("g").attr("class", "label-group");
+            lblG.append("rect").attr("class", "link-label-bg");
+            lblG.append("text").attr("class", "link-label");
+
+            let allLinks = linkEnter.merge(linkSel);
+
+            allLinks.classed("selected", d => selectedEl === d);
+            allLinks.select("path.link-path")
+                .attr("marker-end", d => selectedEl === d ? "url(#arrow-selected)" : "url(#arrow)")
+                .attr("d", d => {
+                    if (d.source === d.target) {
+                        let h = Math.abs(d.source.y - d.cp.y) || 50; let w = 40; 
+                        return `M ${d.source.x - 10},${d.source.y - NODE_R + 2} C ${d.source.x - w},${d.source.y - h} ${d.source.x + w},${d.source.y - h} ${d.source.x + 10},${d.source.y - NODE_R + 2}`;
+                    } else { return `M ${d.source.x},${d.source.y} Q ${d.cp.x},${d.cp.y} ${d.target.x},${d.target.y}`; }
+                });
+
+            allLinks.select("circle.control-point").attr("cx", d => d.cp.x).attr("cy", d => d.cp.y);
+
+            allLinks.each(function(d) {
+                let lbl = isPDA ? d.labels.join(' | ') : d.labels.join(', ');
+                let textEl = d3.select(this).select("text").text(lbl);
+                let bbox = textEl.node().getBBox();
+                let px = d.cp.x, py = d.cp.y;
+                if(d.source === d.target) { let h = Math.abs(d.source.y - d.cp.y) || 50; py = d.source.y - h - 15; } 
+                else { py -= 15; }
+
+                d3.select(this).select("rect")
+                    .attr("x", px - bbox.width/2 - 6).attr("y", py - bbox.height/2 - 4)
+                    .attr("width", bbox.width + 12).attr("height", bbox.height + 8);
+                textEl.attr("x", px).attr("y", py);
+            });
+
+            // Nodes
+            let nodeSel = nodesLayer.selectAll("g.node").data(nodes, d => d.id);
+            nodeSel.exit().remove();
+
+            let nodeEnter = nodeSel.enter().append("g").attr("class", "node")
+                .call(nodeDrag).on("click", (e, d) => { 
+                    e.stopPropagation(); 
+                    if(e.shiftKey) {
+                        if(multiSelectedNodes.has(d)) multiSelectedNodes.delete(d); else multiSelectedNodes.add(d);
+                        clearSelection(true); 
+                    } else {
+                        multiSelectedNodes.clear(); selectEl(d, 'node'); 
+                    }
+                });
+
+            nodeEnter.append("path").attr("class", "start-arrow")
+                .attr("d", `M ${-NODE_R - 25} 0 L ${-NODE_R} 0 M ${-NODE_R - 8} -6 L ${-NODE_R} 0 L ${-NODE_R - 8} 6`);
+            nodeEnter.append("circle").attr("class", "bg").attr("r", NODE_R);
+            nodeEnter.append("circle").attr("class", "inner hidden").attr("r", NODE_R - 4);
+            nodeEnter.append("text");
+
+            let allNodes = nodeEnter.merge(nodeSel);
+            
+            allNodes.attr("transform", d => `translate(${d.x},${d.y})`)
+                .classed("selected", d => selectedEl === d)
+                .classed("multi-selected", d => multiSelectedNodes.has(d))
+                .classed("active", d => d.simActive)
+                .classed("final", d => d.isFinal);
+            
+            allNodes.select(".start-arrow").style("display", d => d.isStart ? "block" : "none");
+            allNodes.select(".inner").classed("hidden", d => !d.isFinal);
+            allNodes.select("text").text(d => d.name);
+        }
+
+        const panel = document.getElementById('inspector-panel');
+        const inspectorHeader = document.getElementById('inspector-header');
+        let isDraggingPanel = false, panelOffset = {x: 0, y: 0};
+        
+        inspectorHeader.addEventListener('mousedown', e => {
+            if(e.target.closest('button')) return; 
+            isDraggingPanel = true;
+            panel.classList.remove('transition-all', 'duration-300');
+            let rect = panel.getBoundingClientRect();
+            panelOffset.x = e.clientX - rect.left;
+            panelOffset.y = e.clientY - rect.top;
+            
+            panel.style.right = 'auto'; 
+            panel.style.bottom = 'auto';
+            panel.style.left = rect.left + 'px';
+            panel.style.top = rect.top + 'px';
+            panel.classList.remove('right-6', 'top-24'); 
+        });
+        
+        window.addEventListener('mousemove', e => {
+            if (!isDraggingPanel) return;
+            let nx = e.clientX - panelOffset.x;
+            let ny = e.clientY - panelOffset.y;
+            
+            let maxW = window.innerWidth - panel.offsetWidth;
+            let maxH = window.innerHeight - panel.offsetHeight;
+            nx = Math.max(0, Math.min(nx, maxW));
+            ny = Math.max(0, Math.min(ny, maxH));
+            
+            panel.style.left = nx + 'px';
+            panel.style.top = ny + 'px';
+        });
+        
+        window.addEventListener('mouseup', () => { 
+            if(isDraggingPanel) {
+                isDraggingPanel = false; 
+                panel.classList.add('transition-all', 'duration-300');
+            }
+        });
+        
+        function selectEl(el, type) {
+            selectedEl = el; selectedType = type; render(); buildInspector();
+            panel.classList.remove('opacity-0', 'pointer-events-none', 'translate-x-4');
+        }
+
+        function clearSelection(skipRender = false) {
+            selectedEl = null; selectedType = null; 
+            panel.classList.add('opacity-0', 'pointer-events-none', 'translate-x-4');
+            if(!skipRender) render();
+        }
+
+        function buildInspector() {
+            const content = document.getElementById('inspector-content');
+            const title = document.getElementById('inspector-title');
+            
+            if (selectedType === 'node') {
+                title.innerText = 'State Properties';
+                content.innerHTML = `
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">State Name</label>
+                        <input type="text" value="${selectedEl.name}" onchange="if(selectedEl){selectedEl.name=this.value;render();saveState();}" class="w-full bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-apple-blue font-medium">
+                    </div>
+                    <div class="mt-1">
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">Description</label>
+                        <textarea onchange="if(selectedEl){selectedEl.description=this.value;saveState();}" class="w-full bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-apple-blue font-medium resize-none h-16" placeholder="Optional details...">${selectedEl.description || ''}</textarea>
+                    </div>
+                    <div class="flex flex-col gap-3 mt-2">
+                        <label class="flex items-center justify-between cursor-pointer group">
+                            <span class="text-sm font-medium">Initial State</span>
+                            <div class="relative w-11 h-6 rounded-full transition-colors ${selectedEl.isStart ? 'bg-apple-green' : 'bg-slate-300 dark:bg-slate-600'}">
+                                <input type="checkbox" ${selectedEl.isStart ? 'checked' : ''} onchange="toggleProp('isStart', this.checked)" class="sr-only">
+                                <div class="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform transform shadow-sm ${selectedEl.isStart ? 'translate-x-5' : ''}"></div>
+                            </div>
+                        </label>
+                        <label class="flex items-center justify-between cursor-pointer group">
+                            <span class="text-sm font-medium">Final State</span>
+                            <div class="relative w-11 h-6 rounded-full transition-colors ${selectedEl.isFinal ? 'bg-apple-green' : 'bg-slate-300 dark:bg-slate-600'}">
+                                <input type="checkbox" ${selectedEl.isFinal ? 'checked' : ''} onchange="toggleProp('isFinal', this.checked)" class="sr-only">
+                                <div class="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform transform shadow-sm ${selectedEl.isFinal ? 'translate-x-5' : ''}"></div>
+                            </div>
+                        </label>
+                    </div>
+                    <button onclick="deleteSelected()" class="mt-4 w-full bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold py-2.5 rounded-xl text-xs transition-all hover:bg-rose-500/20 active:scale-95 border border-rose-500/20">Delete State</button>
+                `;
+            } else if (selectedType === 'link') {
+                title.innerText = 'Transition Properties';
+                let tags = selectedEl.labels.map((l, i) => `
+                    <span class="bg-apple-blue/10 border border-apple-blue/20 text-apple-blue px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 shadow-sm truncate">
+                        ${l} <button onclick="removeLabel(${i})" class="hover:text-rose-500 rounded-full bg-apple-blue/10 w-4 h-4 flex items-center justify-center shrink-0">&times;</button>
+                    </span>
+                `).join('');
+                content.innerHTML = `
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-2">${isPDA ? 'PDA Rules (r,p;p)' : 'Symbols'}</label>
+                        <div class="flex flex-wrap gap-2 mb-3 max-h-32 overflow-y-auto">${tags}</div>
+                        <div class="flex gap-2">
+                            <input type="text" id="prop-new-lbl" placeholder="${isPDA ? 'a,Z;AZ' : 'Sym'}" onkeydown="if(event.key==='Enter') addLabel()" class="flex-1 w-full bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-apple-blue font-mono font-medium">
+                            <button onclick="addLabel()" class="bg-slate-200 dark:bg-slate-700 px-3 py-2 rounded-xl text-sm font-bold hover:bg-slate-300 transition-colors shadow-sm">+</button>
+                        </div>
+                    </div>
+                    <button onclick="deleteSelected()" class="mt-4 w-full bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold py-2.5 rounded-xl text-xs transition-all hover:bg-rose-500/20 active:scale-95 border border-rose-500/20">Delete Transition</button>
+                `;
+            }
+        }
+
+        window.toggleProp = (prop, val) => { if(prop === 'isStart' && val) nodes.forEach(n=>n.isStart=false); if(selectedEl) selectedEl[prop] = val; render(); buildInspector(); saveState(); };
+        window.removeLabel = (i) => { if(selectedEl){ selectedEl.labels.splice(i,1); if(!selectedEl.labels.length) selectedEl.labels.push(isPDA ? `${EPSILON},${EPSILON};${EPSILON}`:EPSILON); render(); buildInspector(); saveState(); }};
+        window.addLabel = () => { let v = document.getElementById('prop-new-lbl').value.trim(); if(v && selectedEl && !selectedEl.labels.includes(v)){ selectedEl.labels.push(v); render(); buildInspector(); saveState(); }};
+
+        // --- Tabs / UI ---
+        function switchTab(tab) {
+            ['sim', 'batch', 'regex', 'tools'].forEach(t => {
+                document.getElementById(`view-${t}`).classList.toggle('hidden', t !== tab);
+                let btn = document.getElementById(`tab-${t}`);
+                if(t === tab) btn.className = "flex-1 text-[11px] font-semibold py-1.5 rounded-lg bg-white dark:bg-slate-700 shadow-sm transition-all text-slate-800 dark:text-slate-200";
+                else btn.className = "flex-1 text-[11px] font-semibold py-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all";
+            });
+        }
+
+        // --- Simulation & BFS Engine (FSA & PDA) ---
+        const tlCont = document.getElementById('sim-timeline');
+        function addLog(title, desc, type='info') {
+            let color = 'bg-apple-blue';
+            if(type === 'success') color = 'bg-apple-green';
+            if(type === 'error') color = 'bg-rose-500';
+            let html = `
+            <div class="timeline-item relative pl-6 pb-3 fade-in">
+                <div class="timeline-line"></div>
+                <div class="absolute w-3 h-3 ${color} rounded-full -left-[5px] top-[4px] shadow-sm ring-4 ring-white dark:ring-[#1a1a1a] z-10"></div>
+                <div class="text-sm font-bold text-slate-800 dark:text-slate-200">${title}</div>
+                ${desc ? `<div class="text-[11px] text-slate-500 font-mono mt-0.5">${desc}</div>` : ''}
+            </div>`;
+            tlCont.innerHTML += html;
+            tlCont.parentElement.scrollTop = tlCont.parentElement.scrollHeight;
+        }
+
+        function evaluateString(inputStr) {
+            let start = nodes.find(n => n.isStart);
+            if(!start) return { err: "No start state" };
+
+            if(!isPDA) {
+                let current = getEClosure(new Set([start.id]));
+                for(let char of inputStr) {
+                    current = getMove(current, char);
+                    if(current.size === 0) return { accepted: false };
+                }
+                return { accepted: Array.from(current).some(id => nodes.find(n=>n.id===id).isFinal) };
+            } else {
+                let queue = [{ node: start.id, stack: "", idx: 0 }];
+                let maxIters = 5000;
+                
+                while(queue.length > 0 && maxIters-- > 0) {
+                    let st = queue.shift();
+                    let isEndStr = st.idx === inputStr.length;
+                    
+                    if(isEndStr && nodes.find(n=>n.id===st.node).isFinal) return { accepted: true };
+                    
+                    let currChar = isEndStr ? null : inputStr[st.idx];
+                    
+                    links.filter(l => l.source.id === st.node).forEach(l => {
+                        l.labels.forEach(lbl => {
+                            let parts = lbl.split(';');
+                            if(parts.length < 2) return;
+                            let rp = parts[0].split(',');
+                            let read = rp[0].trim(), pop = rp.length > 1 ? rp[1].trim() : EPSILON;
+                            let push = parts[1].trim();
+
+                            if(read === EPSILON || read === currChar) {
+                                let canTake = false;
+                                let newStack = st.stack;
+                                if(pop === EPSILON) {
+                                    canTake = true;
+                                } else if(st.stack.endsWith(pop)) {
+                                    canTake = true;
+                                    newStack = st.stack.slice(0, -pop.length);
+                                }
+                                
+                                if(canTake) {
+                                    if(push !== EPSILON) newStack = newStack + push;
+                                    queue.push({
+                                        node: l.target.id,
+                                        stack: newStack,
+                                        idx: (read === EPSILON) ? st.idx : st.idx + 1
+                                    });
+                                }
+                            }
+                        });
+                    });
+                }
+                if(maxIters <= 0) return { err: "PDA loop limit reached (possible infinite epsilons)" };
+                return { accepted: false };
+            }
+        }
+
+        function getEClosure(states) {
+            let closure = new Set(states);
+            let stack = Array.from(states);
+            while(stack.length) {
+                let curr = stack.pop();
+                links.filter(l => l.source.id === curr && l.labels.includes(EPSILON)).forEach(l => {
+                    if(!closure.has(l.target.id)) { closure.add(l.target.id); stack.push(l.target.id); }
+                });
+            }
+            return closure;
+        }
+        function getMove(states, char) {
+            let next = new Set();
+            for(let id of states) links.filter(l => l.source.id === id && l.labels.includes(char)).forEach(l => next.add(l.target.id));
+            return getEClosure(next);
+        }
+        function updateVisuals() { nodes.forEach(n => n.simActive = simState.active.has(n.id)); render(); }
+
+        window.quickSimulation = () => {
+            if(!nodes.length) return showToast("Graph is empty");
+            let str = document.getElementById('sim-input').value;
+            tlCont.innerHTML = '';
+            let res = evaluateString(str);
+            if(res.err) return addLog("Error", res.err, "error");
+            addLog(`Quick Run: "${str}"`, isPDA ? "Simulated PDA BFS" : `Completed NFA computation.`, "info");
+            if(res.accepted) addLog("Result: ACCEPTED", "", "success");
+            else addLog("Result: REJECTED", "", "error");
+            
+            if(!isPDA) {
+                simState.active = getEClosure(new Set([nodes.find(n=>n.isStart).id]));
+                for(let c of str) simState.active = getMove(simState.active, c);
+                updateVisuals(); setTimeout(() => { simState.active.clear(); updateVisuals(); }, 1500);
+            }
+        };
+
+        window.startStepSimulation = () => {
+            if(isPDA) return showToast("Step-by-step is FSA only for now.");
+            if(!nodes.length) return showToast("Graph is empty");
+            let startNode = nodes.find(n => n.isStart);
+            if(!startNode) return showToast("No start state");
+
+            simState.str = document.getElementById('sim-input').value;
+            simState.idx = 0; simState.running = true;
+            document.getElementById('sim-start-controls').classList.add('hidden');
+            document.getElementById('step-controls').classList.remove('hidden');
+            tlCont.innerHTML = ''; 
+            simState.active = getEClosure(new Set([startNode.id]));
+            let names = Array.from(simState.active).map(id => nodes.find(n=>n.id===id).name).join(', ');
+            addLog("Simulation Started", `Initial States: {${names}}`, "info");
+            updateVisuals();
+            if(simState.str.length === 0) finishSim();
+        };
+
+        window.nextStep = () => {
+            if(!simState.running) return;
+            let char = simState.str[simState.idx];
+            let nextStates = getMove(simState.active, char);
+            let names = Array.from(nextStates).map(id => nodes.find(n=>n.id===id).name).join(', ') || 'Ø';
+            addLog(`Read '${char}'`, `Active: {${names}}`, nextStates.size ? "info" : "error");
+            simState.active = nextStates; simState.idx++; updateVisuals();
+            if(simState.active.size === 0) { addLog("Rejected", "Machine in dead state.", "error"); stopSimulation(true); } 
+            else if (simState.idx >= simState.str.length) { finishSim(); }
+        };
+
+        function finishSim() {
+            let isAccepted = Array.from(simState.active).some(id => nodes.find(n=>n.id===id).isFinal);
+            if(isAccepted) addLog("Accepted", "String consumed in Final state.", "success");
+            else addLog("Rejected", "String consumed but not Final.", "error");
+            stopSimulation(true);
+        }
+
+        window.stopSimulation = (keepLogs=false) => {
+            simState.running = false; simState.active.clear(); updateVisuals();
+            document.getElementById('sim-start-controls').classList.remove('hidden');
+            document.getElementById('step-controls').classList.add('hidden');
+            if(!keepLogs) tlCont.innerHTML = '<div class="text-xs text-slate-400 italic text-center mt-4">Simulation stopped.</div>';
+        };
+
+        // --- Batch Testing ---
+        document.getElementById('batch-file-input').addEventListener('change', e => {
+            const f = e.target.files[0]; if(!f) return;
+            const r = new FileReader();
+            r.onload = ev => { document.getElementById('batch-input').value = ev.target.result; showToast("Strings loaded."); };
+            r.readAsText(f); e.target.value = '';
+        });
+
+        window.runBatch = () => {
+            if(nodes.length === 0) return showToast("Graph empty");
+            let lines = document.getElementById('batch-input').value.split('\n').map(l=>l.trim()).filter(l=>l!=='');
+            if(lines.length === 0) lines = [""];
+            const list = document.getElementById('batch-results');
+            list.innerHTML = '';
+            
+            lines.forEach(str => {
+                let res = evaluateString(str);
+                let li = document.createElement('li');
+                li.className = "flex justify-between items-center p-3 text-sm font-mono border-slate-200/50 dark:border-slate-700/50 batch-row";
+                li.dataset.str = str;
+                li.dataset.res = res.err ? "ERR" : (res.accepted ? "ACC" : "REJ");
+                
+                let sDisp = str === "" ? "ε" : str;
+                if(res.err) li.innerHTML = `<span>${sDisp}</span><span class="text-amber-500 font-bold">ERR</span>`;
+                else if(res.accepted) li.innerHTML = `<span>${sDisp}</span><span class="text-emerald-500 font-bold">ACC</span>`;
+                else li.innerHTML = `<span>${sDisp}</span><span class="text-rose-500 font-bold">REJ</span>`;
+                list.appendChild(li);
+            });
+        };
+
+        window.exportBatchResults = () => {
+            let rows = document.querySelectorAll('.batch-row');
+            if(rows.length === 0) return showToast("Run batch first");
+            let csv = "String,Result\n";
+            rows.forEach(r => csv += `${r.dataset.str},${r.dataset.res}\n`);
+            saveFile(new Blob([csv], {type:"text/csv"}), "batch_results", ".csv", "CSV File", "text/csv");
+        };
+
+        // --- Algorithmic Tools ---
+        window.prepNfaToDfa = () => {
+            if(isPDA) return showToast("Conversion not available for PDA.");
+            let start = nodes.find(n=>n.isStart);
+            if(!start) return showToast("Need a start state");
+
+            let alpha = new Set();
+            links.forEach(l => l.labels.forEach(sym => { if(sym !== EPSILON) alpha.add(sym); }));
+            alpha = Array.from(alpha);
+
+            let dfaNodes = [], dfaLinks = [], stateMap = new Map(), queue = [];
+            let initClosure = Array.from(getEClosure(new Set([start.id]))).sort();
+            let cId = 0;
+            let dStart = { id: `Q${cId}`, name: `Q${cId}`, isStart: true, isFinal: initClosure.some(id => nodes.find(n=>n.id===id).isFinal), x: window.innerWidth/2, y: window.innerHeight/2 };
+            dfaNodes.push(dStart); stateMap.set(initClosure.join(','), dStart); queue.push(initClosure); cId++;
+            
+            while(queue.length > 0) {
+                let currSet = queue.shift();
+                let srcNode = stateMap.get(currSet.join(','));
+                
+                for(let sym of alpha) {
+                    let nextSet = Array.from(getMove(currSet, sym)).sort();
+                    if(nextSet.length === 0) continue;
+                    
+                    let nextKey = nextSet.join(',');
+                    let destNode;
+                    if(!stateMap.has(nextKey)) {
+                        destNode = { id: `Q${cId}`, name: `Q${cId}`, isStart: false, isFinal: nextSet.some(id => nodes.find(n=>n.id===id).isFinal), x: window.innerWidth/2 + (cId*60), y: window.innerHeight/2 + ((cId%2===0?1:-1)*60) };
+                        dfaNodes.push(destNode); stateMap.set(nextKey, destNode); queue.push(nextSet);
+                        cId++;
+                    } else { destNode = stateMap.get(nextKey); }
+                    
+                    let link = dfaLinks.find(l => l.source.id === srcNode.id && l.target.id === destNode.id);
+                    if(link) { if(!link.labels.includes(sym)) link.labels.push(sym); } 
+                    else dfaLinks.push({ id: `L${dfaLinks.length}`, source: srcNode, target: destNode, labels: [sym], cp: computeDefaultCP(srcNode, destNode), customCp: false });
+                }
+            }
+
+            nodes = dfaNodes; links = dfaLinks; nId = cId; lId = dfaLinks.length;
+            clearSelection(); autoLayout(); showToast("Converted to DFA"); saveState();
+        };
+
+        window.prepMinimizeDfa = () => {
+            if(isPDA) return showToast("Minimization not available for PDA.");
+            if (!nodes.length) return showToast("Graph is empty");
+            let start = nodes.find(n => n.isStart);
+            if (!start) return showToast("Need a start state");
+
+            let reachable = new Set([start.id]), queue = [start.id];
+            while (queue.length > 0) {
+                let curr = queue.shift();
+                links.filter(l => l.source.id === curr).forEach(l => { if (!reachable.has(l.target.id)) { reachable.add(l.target.id); queue.push(l.target.id); } });
+            }
+            let validNodes = nodes.filter(n => reachable.has(n.id)), validLinks = links.filter(l => reachable.has(l.source.id) && reachable.has(l.target.id));
+
+            let alpha = Array.from(new Set(validLinks.flatMap(l => l.labels).filter(s => s !== EPSILON)));
+            let finalStates = validNodes.filter(n => n.isFinal).map(n => n.id), nonFinalStates = validNodes.filter(n => !n.isFinal).map(n => n.id);
+            let P = [];
+            if (finalStates.length > 0) P.push(finalStates);
+            if (nonFinalStates.length > 0) P.push(nonFinalStates);
+            let W = [...P];
+
+            while (W.length > 0) {
+                let A = W.shift();
+                for (let c of alpha) {
+                    let X = new Set();
+                    validLinks.forEach(l => { if (l.labels.includes(c) && A.includes(l.target.id)) X.add(l.source.id); });
+                    for (let i = 0; i < P.length; i++) {
+                        let Y = P[i], intersection = Y.filter(id => X.has(id)), difference = Y.filter(id => !X.has(id));
+                        if (intersection.length > 0 && difference.length > 0) {
+                            P.splice(i, 1); P.push(intersection, difference);
+                            let wIndex = W.findIndex(w => w === Y);
+                            if (wIndex !== -1) { W.splice(wIndex, 1); W.push(intersection, difference); } 
+                            else { W.push(intersection.length <= difference.length ? intersection : difference); }
+                            i--; 
+                        }
+                    }
+                }
+            }
+
+            let minNodes = [], minLinks = [], partMap = new Map();
+            P.forEach((part, idx) => {
+                let isStart = part.some(id => validNodes.find(n => n.id === id).isStart);
+                let isFinal = part.some(id => validNodes.find(n => n.id === id).isFinal);
+                let name = part.map(id => validNodes.find(n => n.id === id).name).join(',');
+                if (name.length > 10) name = `P${idx}`;
+                let n = { id: `qm${idx}`, name: name, isStart, isFinal, x: window.innerWidth/2, y: window.innerHeight/2 };
+                minNodes.push(n); part.forEach(id => partMap.set(id, n));
+            });
+
+            validLinks.forEach(l => {
+                let s = partMap.get(l.source.id), t = partMap.get(l.target.id);
+                if (!s || !t) return;
+                let existing = minLinks.find(ml => ml.source === s && ml.target === t);
+                l.labels.forEach(sym => {
+                    if (existing) { if (!existing.labels.includes(sym)) existing.labels.push(sym); } 
+                    else { minLinks.push({ id: `lm${minLinks.length}`, source: s, target: t, labels: [sym], cp: computeDefaultCP(s, t), customCp: false }); }
+                });
+            });
+
+            nodes = minNodes; links = minLinks; nId = minNodes.length; lId = minLinks.length;
+            clearSelection(); autoLayout(); showToast("DFA Minimized"); saveState();
+        };
+
+        window.prepGenerateFromRegex = () => {
+            let reg = document.getElementById('regex-input').value.replace(/\s+/g, '');
+            if(!reg) return;
+            try {
+                let postfix = toPostfix(insertExplicitConcat(reg));
+                let stack = [], localNId = 0, localLId = 0;
+                
+                const makeNode = (isFinal=false) => ({ id: `qr${localNId++}`, name: `q${localNId-1}`, isStart: false, isFinal, x:0, y:0 });
+                const makeLink = (s, t, l) => ({ id: `lr${localLId++}`, source: s, target: t, labels: [l], cp:{x:0,y:0}, customCp:false });
+                
+                for(let c of postfix) {
+                    if(c === '.') {
+                        let n2 = stack.pop(), n1 = stack.pop();
+                        n1.end.isFinal = false; n2.start.isStart = false;
+                        stack.push({ start: n1.start, end: n2.end, nodes: [...n1.nodes, ...n2.nodes], links: [...n1.links, ...n2.links, makeLink(n1.end, n2.start, EPSILON)] });
+                    } else if(c === '|') {
+                        let n2 = stack.pop(), n1 = stack.pop();
+                        let start = makeNode(), end = makeNode(true);
+                        n1.end.isFinal = false; n2.end.isFinal = false;
+                        stack.push({ start, end, nodes: [start, ...n1.nodes, ...n2.nodes, end], links: [...n1.links, ...n2.links, makeLink(start, n1.start, EPSILON), makeLink(start, n2.start, EPSILON), makeLink(n1.end, end, EPSILON), makeLink(n2.end, end, EPSILON)] });
+                    } else if(c === '*') {
+                        let n = stack.pop(), start = makeNode(), end = makeNode(true);
+                        n.end.isFinal = false;
+                        stack.push({ start, end, nodes: [start, ...n.nodes, end], links: [...n.links, makeLink(start, n.start, EPSILON), makeLink(start, end, EPSILON), makeLink(n.end, n.start, EPSILON), makeLink(n.end, end, EPSILON)] });
+                    } else {
+                        let start = makeNode(), end = makeNode(true);
+                        stack.push({ start, end, nodes: [start, end], links: [makeLink(start, end, c)] });
+                    }
+                }
+                
+                let res = stack.pop();
+                res.start.isStart = true;
+                
+                nodes = res.nodes; links = res.links; nId = localNId; lId = localLId; 
+                setMode(false); // Force back to FSA if generated a regex
+                nodes.forEach(n => { n.x = window.innerWidth/2 + (Math.random()-0.5)*100; n.y = window.innerHeight/2 + (Math.random()-0.5)*100; });
+                clearSelection(); autoLayout(); showToast("Generated NFA from Regex"); saveState();
+            } catch(e) { showToast("Invalid Regex structure"); }
+        };
+        
+        function insertExplicitConcat(exp) { let res = ""; for(let i=0; i<exp.length; i++) { let c1 = exp[i], c2 = i+1 < exp.length ? exp[i+1] : null; res += c1; if(c2 && !['|', ')', '*'].includes(c2) && !['|', '('].includes(c1)) res += '.'; } return res; }
+        function toPostfix(exp) { let out = "", stack = [], prec = { '*': 3, '.': 2, '|': 1 }; for(let c of exp) { if(/[a-zA-Z0-9]/.test(c)) out += c; else if(c === '(') stack.push(c); else if(c === ')') { while(stack.length && stack[stack.length-1] !== '(') out += stack.pop(); stack.pop(); } else { while(stack.length && stack[stack.length-1] !== '(' && prec[c] <= prec[stack[stack.length-1]]) out += stack.pop(); stack.push(c); } } while(stack.length) out += stack.pop(); return out; }
+
+        // --- Auto Layout ---
+        window.autoLayout = () => {
+            if(!nodes.length) return;
+            let sim = d3.forceSimulation(nodes).force("link", d3.forceLink(links).id(d=>d.id).distance(150)).force("charge", d3.forceManyBody().strength(-1000)).force("center", d3.forceCenter(window.innerWidth/2, window.innerHeight/2)).stop();
+            for (let i = 0; i < 200; ++i) sim.tick();
+            links.forEach(l => { if(!l.customCp) l.cp = computeDefaultCP(l.source, l.target); });
+            if (snapToGrid) { nodes.forEach(n => { n.x = Math.round(n.x/GRID_SIZE)*GRID_SIZE; n.y = Math.round(n.y/GRID_SIZE)*GRID_SIZE; }); }
+            render(); saveState();
+        };
+
+        window.clearCanvas = () => { nodes = []; links = []; nId=0; lId=0; multiSelectedNodes.clear(); clearSelection(); render(); saveState(); };
+        window.toggleTheme = () => { document.documentElement.classList.toggle('dark'); document.getElementById('theme-icon').className = document.documentElement.classList.contains('dark') ? 'ph ph-sun text-lg' : 'ph ph-moon text-lg'; };
+
+        // --- Export Utilities ---
+        async function saveFile(blob, defaultName, extension, description, mimeType) {
+            try {
+                if (window.showSaveFilePicker) {
+                    const handle = await window.showSaveFilePicker({ suggestedName: defaultName + extension, types: [{ description, accept: { [mimeType]: [extension] } }] });
+                    const writable = await handle.createWritable(); await writable.write(blob); await writable.close(); showToast("File saved successfully.");
+                } else {
+                    let name = prompt(`Enter file name to save as ${extension}:`, defaultName);
+                    if (!name) return; if (!name.endsWith(extension)) name += extension;
+                    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url); showToast("File downloaded.");
+                }
+            } catch (err) { if (err.name !== 'AbortError') showToast("Save failed."); }
+        }
+
+        window.exportJSON = () => {
+            let data = {
+                nodes: nodes.map(n => ({ id: n.id, name: n.name, description: n.description || '', x: n.x, y: n.y, isStart: n.isStart, isFinal: n.isFinal })),
+                links: links.map(l => ({ source: l.source.id, target: l.target.id, labels: l.labels, cp: l.cp, customCp: l.customCp })),
+                isPDA: isPDA
+            };
+            saveFile(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }), 'autolab_graph', '.json', 'JSON File', 'application/json');
+        };
+
+        function prepareSVGForExport() {
+            if(nodes.length === 0) return { error: "Canvas is empty" };
+            const svgNode = document.getElementById("canvas").cloneNode(true);
+            svgNode.querySelector('.dragline').remove();
+            let mrq = svgNode.querySelector('#marquee'); if(mrq) mrq.remove();
+            const bgRect = svgNode.querySelector('rect'); if(bgRect) bgRect.remove();
+
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            nodes.forEach(n => { minX = Math.min(minX, n.x - 60); maxX = Math.max(maxX, n.x + 60); minY = Math.min(minY, n.y - 80); maxY = Math.max(maxY, n.y + 60); });
+            links.forEach(l => { minX = Math.min(minX, l.cp.x - 40); maxX = Math.max(maxX, l.cp.x + 40); minY = Math.min(minY, l.cp.y - 40); maxY = Math.max(maxY, l.cp.y + 40); });
+            const padding = 40; minX -= padding; minY -= padding; maxX += padding; maxY += padding;
+            const width = maxX - minX; const height = maxY - minY;
+
+            const zoomGrp = svgNode.querySelector('#zoom-group'); zoomGrp.removeAttribute('transform');
+            svgNode.setAttribute('viewBox', `${minX} ${minY} ${width} ${height}`); svgNode.setAttribute('width', width); svgNode.setAttribute('height', height);
+
+            let style = document.createElement('style');
+            style.textContent = `.bg { fill: #fff; stroke: #d1d5db; stroke-width: 2px; } .inner { fill: none; stroke: #d1d5db; stroke-width: 2px; } .final .inner { display: block; } .inner { display: none; } text { font-family: sans-serif; font-size: 14px; font-weight: 600; fill: #1d1d1f; text-anchor: middle; dominant-baseline: central; } .start-arrow { fill: none; stroke: #1d1d1f; stroke-width: 2px; } .link-path { fill: none; stroke: #9ca3af; stroke-width: 2.5px; } .link-label-bg { fill: #fff; rx: 6px; ry: 6px; } .link-label { font-size: 13px; fill: #1d1d1f; } .control-point { display: none; }`;
+            svgNode.prepend(style);
+            return { node: svgNode, width, height };
+        }
+
+        window.exportSVG = () => {
+            let res = prepareSVGForExport(); if(res.error) return showToast(res.error);
+            saveFile(new Blob([new XMLSerializer().serializeToString(res.node)], {type: "image/svg+xml;charset=utf-8"}), 'autolab_graph', '.svg', 'SVG Image', 'image/svg+xml');
+        };
+
+        window.exportPNG = () => {
+            let res = prepareSVGForExport(); if(res.error) return showToast(res.error);
+            const xml = new XMLSerializer().serializeToString(res.node);
+            const svg64 = btoa(unescape(encodeURIComponent(xml)));
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas'); const scale = 3;
+                canvas.width = res.width * scale; canvas.height = res.height * scale;
+                const ctx = canvas.getContext('2d'); ctx.scale(scale, scale); 
+                ctx.fillStyle = document.documentElement.classList.contains('dark') ? '#0d0d0d' : '#ffffff'; ctx.fillRect(0, 0, res.width, res.height); ctx.drawImage(img, 0, 0);
+                canvas.toBlob(blob => saveFile(blob, 'autolab_graph', '.png', 'PNG Image', 'image/png'));
+            };
+            img.src = 'data:image/svg+xml;base64,' + svg64;
+        };
+
+        window.exportTikZ = () => {
+            if(nodes.length === 0) return showToast("Canvas is empty");
+            let tex = `\\begin{tikzpicture}[scale=0.15, auto, node distance=2cm, every loop/.style={}, thick,\n  node/.style={circle, draw, minimum size=1cm, inner sep=0pt, font=\\sffamily},\n  final/.style={double, double distance=1.5pt},\n  initial text=]\n`;
+            let nMap = new Map();
+            nodes.forEach((n, i) => {
+                nMap.set(n.id, `s${i}`); let flags = "node";
+                if(n.isStart) flags += ", initial, initial where=left"; if(n.isFinal) flags += ", final";
+                tex += `  \\node[${flags}] (${nMap.get(n.id)}) at (${(n.x).toFixed(1)}, ${(-n.y).toFixed(1)}) {${n.name}};\n`;
+            });
+            links.forEach(l => {
+                let lbl = (isPDA ? l.labels.join(' \\mid ') : l.labels.join(',')).replace(/ε/g, '\\epsilon');
+                let s = nMap.get(l.source.id), t = nMap.get(l.target.id);
+                if(s === t) { tex += `  \\path[->] (${s}) edge [loop above] node {${lbl}} (${t});\n`; } else { tex += `  \\path[->] (${s}) edge [bend left=15] node {${lbl}} (${t});\n`; }
+            });
+            tex += `\\end{tikzpicture}`;
+            saveFile(new Blob([tex], {type: "text/plain;charset=utf-8"}), 'autolab_tikz', '.tex', 'LaTeX File', 'text/plain');
+        };
+
+        window.exportJFLAP = () => {
+            if(nodes.length === 0) return showToast("Canvas is empty");
+            let xml = `<?xml version="1.0" encoding="UTF-8" standalone="no"?><!--Created by AutoLab-->\n<structure>\n&#9;<type>${isPDA?'pda':'fa'}</type>\n&#9;<automaton>\n`;
+            let nMap = new Map();
+            nodes.forEach((n, i) => {
+                nMap.set(n.id, i); xml += `&#9;&#9;<state id="${i}" name="${n.name}">\n&#9;&#9;&#9;<x>${n.x.toFixed(1)}</x>\n&#9;&#9;&#9;<y>${n.y.toFixed(1)}</y>\n`;
+                if(n.isStart) xml += `&#9;&#9;&#9;<initial/>\n`; if(n.isFinal) xml += `&#9;&#9;&#9;<final/>\n`;
+                xml += `&#9;&#9;</state>\n`;
+            });
+            links.forEach(l => {
+                l.labels.forEach(lbl => {
+                    xml += `&#9;&#9;<transition>\n&#9;&#9;&#9;<from>${nMap.get(l.source.id)}</from>\n&#9;&#9;&#9;<to>${nMap.get(l.target.id)}</to>\n`;
+                    if(isPDA) {
+                        let parts = lbl.split(';'); let rp = parts[0].split(',');
+                        let r = rp[0].trim(), p = rp.length>1?rp[1].trim():EPSILON, u = parts[1].trim();
+                        xml += `&#9;&#9;&#9;<read>${r===EPSILON?'':r}</read>\n&#9;&#9;&#9;<pop>${p===EPSILON?'':p}</pop>\n&#9;&#9;&#9;<push>${u===EPSILON?'':u}</push>\n`;
+                    } else { xml += `&#9;&#9;&#9;<read>${lbl===EPSILON?'':lbl}</read>\n`; }
+                    xml += `&#9;&#9;</transition>\n`;
+                });
+            });
+            xml += `&#9;</automaton>\n</structure>`;
+            saveFile(new Blob([xml], {type: "text/xml;charset=utf-8"}), 'autolab', '.jff', 'JFLAP File', 'text/xml');
+        };
+
+        function showToast(msg) {
+            const t = document.getElementById('toast'); document.getElementById('toast-msg').innerText = msg;
+            t.classList.remove('opacity-0', 'translate-y-4'); t.classList.add('opacity-100', 'translate-y-0');
+            setTimeout(() => { t.classList.remove('opacity-100', 'translate-y-0'); t.classList.add('opacity-0', 'translate-y-4'); }, 2500);
+        }
+
+        window.addEventListener('resize', () => svg.attr('width', window.innerWidth).attr('height', window.innerHeight));
+        
+        // Initial setup from LocalStorage
+        window.onload = () => loadFromLocal();
+    </script>
+</body>
+</html>
