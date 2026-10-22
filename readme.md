@@ -19,7 +19,7 @@ It's a minimal and interactive web app where you can draw your automaton and see
 
 ## 🚀 How to use it?
 Download `index.html` and double-click it to open it in your browser.
-Otherwise, go to [https://imnotat9.github.io/Simulatore-automi-a-stati-finiti/](https://imnotat9.github.io/AutoLab/)
+Otherwise, go to(https://imnotat9.github.io/AutoLab/)
     
 ---
 *Happy simulating!* 🧑‍💻
