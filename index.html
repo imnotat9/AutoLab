@@ -297,11 +297,11 @@
                 <div id="view-regex" class="hidden p-5 flex flex-col gap-4">
                     <div>
                         <label class="block text-xs font-semibold text-slate-500 mb-1.5">Regular Expression</label>
-                        <input type="text" id="regex-input" class="w-full bg-white/60 dark:bg-black/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-apple-blue font-mono transition-shadow shadow-inner" placeholder="(a|b)*abb">
+                        <input type="text" id="regex-input" class="w-full bg-white/60 dark:bg-black/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-apple-blue font-mono transition-shadow shadow-inner" placeholder="(a|b)*abb">
                         <p class="text-[10px] text-slate-400 mt-2 leading-relaxed">Supported: <code class="bg-slate-200 dark:bg-slate-800 px-1 rounded">|</code>, <code class="bg-slate-200 dark:bg-slate-800 px-1 rounded">*</code>, implicit concatenation, and parentheses.</p>
                     </div>
-                    <button onclick="generateMinimizedDfaFromRegex()" class="w-full bg-apple-blue hover:bg-blue-600 text-white text-xs font-bold py-2.5 rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2">
-                        <i class="ph ph-magic-wand"></i> Generate Minimized DFA
+                    <button onclick="prepGenerateFromRegex()" class="w-full bg-apple-blue hover:bg-blue-600 text-white text-xs font-bold py-2.5 rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2">
+                        <i class="ph ph-magic-wand"></i> Generate NFA
                     </button>
                 </div>
 
@@ -1372,23 +1372,6 @@
         
         // Initial setup from LocalStorage
         window.onload = () => loadFromLocal();
-
-        window.generateMinimizedDfaFromRegex = () => {
-            // 1. Genera l'NFA di partenza dalla Regex
-            prepGenerateFromRegex();
-            
-            // Se la generazione ha avuto successo, procede in automatico
-            if (nodes.length > 0) {
-                // 2. Converte l'NFA in DFA istantaneamente
-                prepNfaToDfa();
-                
-                // 3. Minimizza il DFA per ottenere il risultato compatto finale
-                prepMinimizeDfa();
-                
-                // Sovrascrive i log precedenti con un messaggio finale pulito
-                showToast("DFA Minimizzato generato con successo!");
-            }
-        };
     </script>
 </body>
 </html>
